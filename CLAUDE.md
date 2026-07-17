@@ -16,3 +16,8 @@
 - Supabase project: `obsidian-online` (`placjyxifdtvlkjyztnx`), config in `src/lib/config.ts`.
 - E2E tests mock the Supabase HTTP API at the network layer in `e2e/mock-supabase.ts`;
   keep it in sync when adding new Supabase calls.
+- Obsidian formatting (frontmatter, callouts, highlights, tags, embeds) is implemented
+  client-side in `src/lib/markdown.tsx` + `src/lib/frontmatter.ts`.
+- `supabase/functions/vault-mcp/` is an MCP server (Edge Function) for Claude access;
+  auth = anon-key JWT + `x-vault-token` checked against RLS-locked `public.mcp_tokens`.
+  Redeploy via the Supabase MCP `deploy_edge_function` tool after editing.

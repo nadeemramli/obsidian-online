@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
+import { stripFrontmatter } from '../lib/frontmatter'
 
 function excerpt(md: string): string {
-  return md
-    .replace(/[#*_`>\[\]!]/g, '')
+  return stripFrontmatter(md)
+    .replace(/[#*_`>\[\]!=]/g, '')
     .replace(/\(storage:[^)]+\)/g, '')
     .replace(/\s+/g, ' ')
     .trim()

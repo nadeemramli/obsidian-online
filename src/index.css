@@ -184,6 +184,57 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .markdown hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
 .img-loading { color: var(--muted); font-size: 13px; }
 
+/* Obsidian-style extras */
+.markdown mark { background: rgba(250, 204, 21, 0.28); color: inherit; padding: 0 3px; border-radius: 3px; }
+
+.tag {
+  display: inline-block;
+  background: rgba(167, 139, 250, 0.14);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 0.85em;
+  margin: 0 1px;
+}
+
+.callout { border-left-width: 4px; padding: 10px 16px 6px; color: var(--text); }
+.callout-title { font-weight: 700; margin: 0 0 4px; }
+.callout-note, .callout-info, .callout-abstract, .callout-summary { border-left-color: var(--link); }
+.callout-note .callout-title, .callout-info .callout-title { color: var(--link); }
+.callout-tip, .callout-hint, .callout-success, .callout-check, .callout-done { border-left-color: #4ade80; }
+.callout-tip .callout-title, .callout-success .callout-title { color: #4ade80; }
+.callout-warning, .callout-caution, .callout-attention, .callout-question { border-left-color: #facc15; }
+.callout-warning .callout-title, .callout-caution .callout-title { color: #facc15; }
+.callout-danger, .callout-error, .callout-failure, .callout-bug { border-left-color: var(--danger); }
+.callout-danger .callout-title, .callout-error .callout-title { color: var(--danger); }
+.callout-quote, .callout-cite, .callout-example { border-left-color: var(--muted); }
+
+.embed {
+  display: block;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 10px 16px;
+  margin: 0.8em 0;
+}
+.embed-title { display: block; font-weight: 600; font-size: 13px; color: var(--accent); margin-bottom: 2px; }
+.embed-title:hover { text-decoration: none; }
+.embed-body { display: block; font-size: 0.93em; }
+
+/* Frontmatter properties panel */
+.props {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 10px 16px;
+  margin: 10px 0 18px;
+  font-size: 13.5px;
+}
+.prop-row { display: flex; gap: 14px; padding: 3px 0; }
+.prop-key { color: var(--muted); min-width: 110px; flex: none; }
+.prop-value { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+
 .wikilink { color: var(--accent); border-bottom: 1px solid rgba(167, 139, 250, 0.35); }
 .wikilink:hover { text-decoration: none; border-bottom-color: var(--accent); }
 .wikilink.missing { color: var(--danger); border-bottom-style: dashed; border-bottom-color: rgba(248, 113, 113, 0.5); }

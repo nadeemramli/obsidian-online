@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
-import { Markdown } from '../lib/markdown'
+import { NoteContent } from '../lib/markdown'
 import { findBacklinks } from '../lib/notes'
 
 export default function NoteView() {
@@ -36,9 +36,7 @@ export default function NoteView() {
           </Link>
         </div>
       </div>
-      <article className="markdown">
-        <Markdown content={note.content} knownSlugs={knownSlugs} />
-      </article>
+      <NoteContent content={note.content} knownSlugs={knownSlugs} />
       <section className="backlinks">
         <h3>Linked from ({backlinks.length})</h3>
         {backlinks.length === 0 ? (

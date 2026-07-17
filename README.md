@@ -6,8 +6,12 @@ and attach screenshots. Built as a client-side SPA on Supabase + Vercel.
 
 ## Features
 - **Markdown** rendering (GitHub-flavored: tables, code, quotes, etc.)
+- **Obsidian syntax**: YAML frontmatter (rendered as a properties panel), `> [!note]` callouts,
+  `==highlights==`, `#tags`, and `![[Note]]` embeds
 - **Wikilinks**: `[[Note title]]` and `[[Note title|alias]]`; links to missing notes are flagged and can be created
 - **Backlinks**: every note lists what links to it
+- **Claude integration**: `vault-mcp` Supabase Edge Function exposes the vault as an MCP server
+  (see `docs/COWORK.md`)
 - **Search** across titles and content
 - **Full editor**: create / edit / delete, Write/Preview toggle, screenshot upload
 - **Private**: Supabase Auth + Row Level Security; nothing is visible without logging in

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { createNote, deleteNote, updateNote, type Note } from '../lib/notes'
 import { useNotes } from '../lib/notesContext'
 import { supabase } from '../lib/supabase'
-import { Markdown } from '../lib/markdown'
+import { NoteContent } from '../lib/markdown'
 
 export function Editor({
   existing,
@@ -111,14 +111,13 @@ export function Editor({
         </div>
       </div>
       <p className="hint">
-        Link notes with <code>[[Note title]]</code>. Paste markdown from Claude directly, or attach a
-        screenshot below.
+        Obsidian syntax supported: <code>[[wikilinks]]</code>, <code>![[embeds]]</code>,{' '}
+        <code>==highlights==</code>, <code>#tags</code>, <code>&gt; [!note]</code> callouts, and YAML
+        frontmatter (<code>---</code>). Paste markdown from Claude directly, or attach a screenshot below.
       </p>
       {err && <div className="msg error">{err}</div>}
       {preview ? (
-        <article className="markdown">
-          <Markdown content={content} knownSlugs={knownSlugs} />
-        </article>
+        <NoteContent content={content} knownSlugs={knownSlugs} />
       ) : (
         <>
           <textarea

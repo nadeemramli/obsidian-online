@@ -1,41 +1,99 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
 import { slugify } from './notes'
+import { useNotes } from './notesContext'
+import { parseFrontmatter, stripFrontmatter, type Frontmatter } from './frontmatter'
 import { supabase } from './supabase'
 
-// remark plugin: turn [[Title]] and [[Title|alias]] into internal link nodes.
-function remarkWikilinks() {
+// remark plugin: Obsidian inline syntax inside text nodes —
+//   ![[Note]]        note embed
+//   [[Note|alias]]   wikilink
+//   ==text==         highlight
+//   #tag             tag chip
+const INLINE_RE = /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]|==([^=\n]+)==|(^|\s)#([A-Za-z][\w/-]*)/g
+
+function remarkObsidianInline() {
   return (tree: any) => {
     visit(tree, 'text', (node: any, index: any, parent: any) => {
       if (!parent || index === null || index === undefined) return
+      // Don't rewrite text inside links (e.g. a URL's visible text).
+      if (parent.type === 'link') return
       const value: string = node.value
-      const regex = /\[\[([^\]]+)\]\]/g
+      INLINE_RE.lastIndex = 0
       const children: any[] = []
       let last = 0
-      let hasMatch = false
       let m: RegExpExecArray | null
-      while ((m = regex.exec(value)) !== null) {
-        hasMatch = true
-        if (m.index > last) {
-          children.push({ type: 'text', value: value.slice(last, m.index) })
+      while ((m = INLINE_RE.exec(value)) !== null) {
+        const [embed, wiki, highlight, tagSpace, tag] = [m[1], m[2], m[3], m[4], m[5]]
+        if (m.index > last) children.push({ type: 'text', value: value.slice(last, m.index) })
+
+        if (embed !== undefined) {
+          const target = embed.split('|')[0].trim()
+          children.push({
+            type: 'link',
+            url: `#/embed/${slugify(target)}`,
+            children: [{ type: 'text', value: target }],
+          })
+        } else if (wiki !== undefined) {
+          const [rawTarget, alias] = wiki.split('|')
+          const target = rawTarget.trim()
+          children.push({
+            type: 'link',
+            url: `#/note/${slugify(target)}`,
+            children: [{ type: 'text', value: (alias ?? rawTarget).trim() }],
+          })
+        } else if (highlight !== undefined) {
+          children.push({
+            type: 'strong',
+            data: { hName: 'mark' },
+            children: [{ type: 'text', value: highlight }],
+          })
+        } else if (tag !== undefined) {
+          if (tagSpace) children.push({ type: 'text', value: tagSpace })
+          children.push({
+            type: 'strong',
+            data: { hName: 'span', hProperties: { className: ['tag'] } },
+            children: [{ type: 'text', value: `#${tag}` }],
+          })
         }
-        const [rawTarget, alias] = m[1].split('|')
-        const target = rawTarget.trim()
-        const label = (alias ?? rawTarget).trim()
-        const slug = slugify(target)
-        children.push({
-          type: 'link',
-          url: `#/note/${slug}`,
-          children: [{ type: 'text', value: label }],
-        })
         last = m.index + m[0].length
       }
-      if (!hasMatch) return
+      if (children.length === 0) return
       if (last < value.length) children.push({ type: 'text', value: value.slice(last) })
       parent.children.splice(index, 1, ...children)
       return index + children.length
+    })
+  }
+}
+
+// remark plugin: Obsidian callouts — blockquotes starting with [!type] Title.
+function remarkCallouts() {
+  return (tree: any) => {
+    visit(tree, 'blockquote', (node: any) => {
+      const firstPara = node.children?.[0]
+      if (!firstPara || firstPara.type !== 'paragraph') return
+      const firstText = firstPara.children?.[0]
+      if (!firstText || firstText.type !== 'text') return
+      const m = firstText.value.match(/^\[!([A-Za-z]+)\][+-]?[ \t]*([^\n]*)\n?/)
+      if (!m) return
+
+      const type = m[1].toLowerCase()
+      const title = m[2].trim() || type.charAt(0).toUpperCase() + type.slice(1)
+      firstText.value = firstText.value.slice(m[0].length)
+      if (!firstText.value && firstPara.children.length === 1) {
+        node.children.shift()
+      }
+      node.data = {
+        ...node.data,
+        hProperties: { className: ['callout', `callout-${type}`] },
+      }
+      node.children.unshift({
+        type: 'paragraph',
+        data: { hName: 'div', hProperties: { className: ['callout-title'] } },
+        children: [{ type: 'text', value: title }],
+      })
     })
   }
 }
@@ -59,21 +117,58 @@ function StorageImage({ src, alt }: { src: string; alt?: string }) {
   return <img src={url} alt={alt || ''} />
 }
 
+// Renders another note inline for ![[Note]]; one level deep to avoid cycles.
+function NoteEmbed({ slug, depth }: { slug: string; depth: number }) {
+  const { notes } = useNotes()
+  const note = notes.find((n) => n.slug === slug)
+  const knownSlugs = useMemo(() => new Set(notes.map((n) => n.slug)), [notes])
+
+  if (!note) {
+    return (
+      <a href={`#/note/${slug}`} className="wikilink missing">
+        {slug}
+      </a>
+    )
+  }
+  if (depth >= 1) {
+    return (
+      <a href={`#/note/${slug}`} className="wikilink">
+        {note.title}
+      </a>
+    )
+  }
+  return (
+    <span className="embed">
+      <a className="embed-title" href={`#/note/${slug}`}>
+        {note.title}
+      </a>
+      <span className="embed-body markdown">
+        <Markdown content={stripFrontmatter(note.content)} knownSlugs={knownSlugs} depth={depth + 1} />
+      </span>
+    </span>
+  )
+}
+
 export function Markdown({
   content,
   knownSlugs,
+  depth = 0,
 }: {
   content: string
   knownSlugs: Set<string>
+  depth?: number
 }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkWikilinks]}
+      remarkPlugins={[remarkGfm, remarkObsidianInline, remarkCallouts]}
       // react-markdown sanitizes non-http(s) URLs; keep our storage: scheme
       // so StorageImage can resolve it to a signed URL.
       urlTransform={(url) => (url.startsWith('storage:') ? url : defaultUrlTransform(url))}
       components={{
         a({ node, href, children, ...rest }: any) {
+          if (typeof href === 'string' && href.startsWith('#/embed/')) {
+            return <NoteEmbed slug={href.replace('#/embed/', '')} depth={depth} />
+          }
           if (typeof href === 'string' && href.startsWith('#/note/')) {
             const s = href.replace('#/note/', '')
             const missing = !knownSlugs.has(s)
@@ -99,5 +194,46 @@ export function Markdown({
     >
       {content}
     </ReactMarkdown>
+  )
+}
+
+function PropertyValue({ name, value }: { name: string; value: string | string[] }) {
+  const values = Array.isArray(value) ? value : [value]
+  if (name.toLowerCase() === 'tags') {
+    return (
+      <>
+        {values.map((v) => (
+          <span key={v} className="tag">
+            #{v.replace(/^#/, '')}
+          </span>
+        ))}
+      </>
+    )
+  }
+  return <>{values.join(', ')}</>
+}
+
+// Frontmatter properties panel + rendered body, like Obsidian's reading view.
+export function NoteContent({ content, knownSlugs }: { content: string; knownSlugs: Set<string> }) {
+  const { data, body } = useMemo(() => parseFrontmatter(content), [content])
+  const entries = Object.entries(data) as Array<[string, Frontmatter[string]]>
+  return (
+    <>
+      {entries.length > 0 && (
+        <section className="props" aria-label="Properties">
+          {entries.map(([k, v]) => (
+            <div className="prop-row" key={k}>
+              <span className="prop-key">{k}</span>
+              <span className="prop-value">
+                <PropertyValue name={k} value={v} />
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+      <article className="markdown">
+        <Markdown content={body} knownSlugs={knownSlugs} />
+      </article>
+    </>
   )
 }
