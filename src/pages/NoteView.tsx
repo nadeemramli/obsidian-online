@@ -28,6 +28,7 @@ export default function NoteView() {
 
   return (
     <div className="page">
+      {note.folder && <div className="crumb muted">📁 {note.folder}</div>}
       <div className="page-head">
         <h1>{note.title}</h1>
         <div className="head-actions">

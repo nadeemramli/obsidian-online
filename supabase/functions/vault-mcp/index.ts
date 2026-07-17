@@ -12,15 +12,18 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 )
 
-const SERVER_INFO = { name: 'vault-mcp', version: '1.0.0' }
+const SERVER_INFO = { name: 'vault-mcp', version: '1.1.0' }
 
 const TOOLS = [
   {
     name: 'list_notes',
-    description: 'List notes in the vault (most recently updated first). Returns title, slug and updated_at.',
+    description: 'List notes in the vault (most recently updated first). Returns title, slug, folder and updated_at.',
     inputSchema: {
       type: 'object',
-      properties: { limit: { type: 'number', description: 'Max notes to return (default 50)' } },
+      properties: {
+        limit: { type: 'number', description: 'Max notes to return (default 50)' },
+        folder: { type: 'string', description: 'Only notes in this folder path (optional)' },
+      },
     },
   },
   {
@@ -34,7 +37,7 @@ const TOOLS = [
   },
   {
     name: 'search_notes',
-    description: 'Search notes by a keyword across titles and content. Returns matching titles, slugs and a snippet.',
+    description: 'Search notes by a keyword across titles, content and folders. Returns matching titles, slugs, folders and a snippet.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -47,25 +50,30 @@ const TOOLS = [
   {
     name: 'create_note',
     description:
-      'Create a markdown note. Supports Obsidian syntax: YAML frontmatter, [[wikilinks]], ![[embeds]], ==highlights==, #tags, > [!note] callouts. A unique slug is generated from the title.',
+      'Create a markdown note. Supports Obsidian syntax: YAML frontmatter, [[wikilinks]], ![[embeds]], ![[image.png]] attachments, ==highlights==, #tags, > [!note] callouts. A unique slug is generated from the title.',
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Note title' },
         content: { type: 'string', description: 'Markdown body (may start with YAML frontmatter)' },
+        folder: {
+          type: 'string',
+          description: 'Folder path like "Books/Stats 101" (optional; "" = vault root)',
+        },
       },
       required: ['title', 'content'],
     },
   },
   {
     name: 'update_note',
-    description: 'Update the title and/or content of an existing note, addressed by slug.',
+    description: 'Update the title, content and/or folder of an existing note, addressed by slug.',
     inputSchema: {
       type: 'object',
       properties: {
         slug: { type: 'string', description: 'Slug of the note to update' },
         title: { type: 'string', description: 'New title (optional)' },
         content: { type: 'string', description: 'New markdown content (optional)' },
+        folder: { type: 'string', description: 'New folder path (optional)' },
       },
       required: ['slug'],
     },
@@ -84,18 +92,20 @@ const TOOLS = [
 async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
     case 'list_notes': {
-      const { data, error } = await supabase
+      let q = supabase
         .from('notes')
-        .select('title, slug, updated_at')
+        .select('title, slug, folder, updated_at')
         .order('updated_at', { ascending: false })
         .limit(Number(args.limit) || 50)
+      if (typeof args.folder === 'string' && args.folder !== '') q = q.eq('folder', args.folder)
+      const { data, error } = await q
       if (error) throw new Error(error.message)
       return data
     }
     case 'get_note': {
       const { data, error } = await supabase
         .from('notes')
-        .select('title, slug, content, created_at, updated_at')
+        .select('title, slug, content, folder, created_at, updated_at')
         .eq('slug', String(args.slug))
         .maybeSingle()
       if (error) throw new Error(error.message)
@@ -106,8 +116,8 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       const q = String(args.query).replaceAll('%', '\\%').replaceAll('_', '\\_')
       const { data, error } = await supabase
         .from('notes')
-        .select('title, slug, content, updated_at')
-        .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
+        .select('title, slug, content, folder, updated_at')
+        .or(`title.ilike.%${q}%,content.ilike.%${q}%,folder.ilike.%${q}%`)
         .order('updated_at', { ascending: false })
         .limit(Number(args.limit) || 20)
       if (error) throw new Error(error.message)
@@ -115,27 +125,30 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
         const i = n.content.toLowerCase().indexOf(String(args.query).toLowerCase())
         const snippet =
           i >= 0 ? n.content.slice(Math.max(0, i - 80), i + 120) : n.content.slice(0, 200)
-        return { title: n.title, slug: n.slug, updated_at: n.updated_at, snippet }
+        return { title: n.title, slug: n.slug, folder: n.folder, updated_at: n.updated_at, snippet }
       })
     }
     case 'create_note': {
       const { data, error } = await supabase.rpc('add_note', {
         p_title: String(args.title),
         p_content: String(args.content),
+        p_folder: typeof args.folder === 'string' ? args.folder : '',
       })
       if (error) throw new Error(error.message)
-      return { title: data.title, slug: data.slug, url: `#/note/${data.slug}` }
+      return { title: data.title, slug: data.slug, folder: data.folder, url: `#/note/${data.slug}` }
     }
     case 'update_note': {
       const patch: Record<string, string> = {}
       if (typeof args.title === 'string') patch.title = args.title
       if (typeof args.content === 'string') patch.content = args.content
-      if (Object.keys(patch).length === 0) throw new Error('Provide title and/or content to update')
+      if (typeof args.folder === 'string') patch.folder = args.folder
+      if (Object.keys(patch).length === 0)
+        throw new Error('Provide title, content and/or folder to update')
       const { data, error } = await supabase
         .from('notes')
         .update(patch)
         .eq('slug', String(args.slug))
-        .select('title, slug, updated_at')
+        .select('title, slug, folder, updated_at')
         .maybeSingle()
       if (error) throw new Error(error.message)
       if (!data) throw new Error(`No note with slug "${args.slug}"`)
@@ -219,7 +232,7 @@ Deno.serve(async (req: Request) => {
           capabilities: { tools: { listChanged: false } },
           serverInfo: SERVER_INFO,
           instructions:
-            'Markdown vault ("online Obsidian"). Notes support YAML frontmatter, [[wikilinks]], ![[embeds]], ==highlights==, #tags and callouts. Use create_note to save book notes; search_notes/get_note to read existing ones.',
+            'Markdown vault ("online Obsidian"). Notes support YAML frontmatter, [[wikilinks]], ![[embeds]], ![[image.png]] attachments, ==highlights==, #tags, callouts, and folders (path-like, e.g. "Books/Stats 101"). Use create_note to save book notes; search_notes/get_note to read existing ones.',
         })
       case 'ping':
         return rpcResult(msg.id, {})

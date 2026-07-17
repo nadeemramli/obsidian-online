@@ -45,7 +45,7 @@ The endpoint speaks JSON-RPC 2.0. To call a tool, POST:
 {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_note","arguments":{"title":"...","content":"..."}}}
 ```
 
-Available tools: `list_notes {limit?}`, `get_note {slug}`, `search_notes {query, limit?}`, `create_note {title, content}`, `update_note {slug, title?, content?}`, `delete_note {slug}`.
+Available tools: `list_notes {limit?, folder?}`, `get_note {slug}`, `search_notes {query, limit?}`, `create_note {title, content, folder?}`, `update_note {slug, title?, content?, folder?}`, `delete_note {slug}`.
 
 First, verify the connection by calling `list_notes` and telling me what's in the vault.
 
@@ -78,6 +78,7 @@ created: <today's date, YYYY-MM-DD>
 
 Rules:
 - One concept per note, titled by concept (e.g. "Bayes Theorem"), not by chapter number — chapter goes in the frontmatter.
+- File notes into folders with the `folder` argument, one folder per book (e.g. `folder: "Books/<book title>"`).
 - Before creating, `search_notes` for the concept; if a note already exists, `update_note` to enrich it instead of duplicating.
 - After saving, report the note's title and slug.
 

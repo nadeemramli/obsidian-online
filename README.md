@@ -7,7 +7,11 @@ and attach screenshots. Built as a client-side SPA on Supabase + Vercel.
 ## Features
 - **Markdown** rendering (GitHub-flavored: tables, code, quotes, etc.)
 - **Obsidian syntax**: YAML frontmatter (rendered as a properties panel), `> [!note]` callouts,
-  `==highlights==`, `#tags`, and `![[Note]]` embeds
+  `==highlights==`, `#tags`, `![[Note]]` embeds, and `![[image.png]]` / `![[image.png|300]]` attachments
+- **Folders**: path-like folders (`Books/Stats 101`) with a collapsible sidebar tree
+- **Images**: drag & drop, paste, or attach; stored privately in Supabase Storage and
+  rendered through short-lived signed URLs
+- **Graph view**: force-directed graph of notes connected by wikilinks
 - **Wikilinks**: `[[Note title]]` and `[[Note title|alias]]`; links to missing notes are flagged and can be created
 - **Backlinks**: every note lists what links to it
 - **Claude integration**: `vault-mcp` Supabase Edge Function exposes the vault as an MCP server

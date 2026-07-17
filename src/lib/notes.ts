@@ -5,6 +5,7 @@ export type Note = {
   title: string
   slug: string
   content: string
+  folder: string
   created_at: string
   updated_at: string
 }
@@ -41,11 +42,11 @@ async function uniqueSlug(base: string): Promise<string> {
   }
 }
 
-export async function createNote(title: string, content: string): Promise<Note> {
+export async function createNote(title: string, content: string, folder = ''): Promise<Note> {
   const slug = await uniqueSlug(slugify(title))
   const { data, error } = await supabase
     .from('notes')
-    .insert({ title: title.trim(), slug, content })
+    .insert({ title: title.trim(), slug, content, folder: folder.trim() })
     .select()
     .single()
   if (error) throw error
@@ -54,7 +55,7 @@ export async function createNote(title: string, content: string): Promise<Note> 
 
 export async function updateNote(
   id: string,
-  patch: { title?: string; content?: string },
+  patch: { title?: string; content?: string; folder?: string },
 ): Promise<Note> {
   const { data, error } = await supabase
     .from('notes')

@@ -16,6 +16,17 @@ export function deriveTitle(content: string): string {
   return ''
 }
 
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
+
+function sanitizeImageName(name: string): string {
+  const clean = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-]+$/g, '')
+  return clean || 'image'
+}
+
 export function Editor({
   existing,
   initialTitle = '',
@@ -25,14 +36,20 @@ export function Editor({
 }) {
   const [title, setTitle] = useState(existing?.title ?? initialTitle)
   const [content, setContent] = useState(existing?.content ?? '')
+  const [folder, setFolder] = useState(existing?.folder ?? '')
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const { notes, reload } = useNotes()
   const knownSlugs = useMemo(() => new Set(notes.map((n) => n.slug)), [notes])
+  const folders = useMemo(
+    () => Array.from(new Set(notes.map((n) => n.folder).filter(Boolean))).sort(),
+    [notes],
+  )
 
   async function save() {
     let finalTitle = title.trim()
@@ -51,10 +68,10 @@ export function Editor({
     try {
       let slug: string
       if (existing) {
-        const n = await updateNote(existing.id, { title: finalTitle, content })
+        const n = await updateNote(existing.id, { title: finalTitle, content, folder: folder.trim() })
         slug = n.slug
       } else {
-        const n = await createNote(finalTitle, content)
+        const n = await createNote(finalTitle, content, folder)
         slug = n.slug
       }
       await reload()
@@ -90,20 +107,36 @@ export function Editor({
     setContent((c) => c.slice(0, start) + text + c.slice(end))
   }
 
-  async function onUpload(file: File) {
-    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
-    const path = `${crypto.randomUUID()}.${ext}`
+  // Upload keeping a readable filename so notes read like Obsidian:
+  // ![[sampling-diagram.png]]. On a name collision, add a short suffix.
+  async function uploadImage(file: File): Promise<string | null> {
+    let name = sanitizeImageName(file.name || 'pasted-image.png')
+    if (!IMAGE_EXT_RE.test(name)) name += '.png'
+    const contentType = file.type || 'image/png'
+
+    let { error } = await supabase.storage.from('screenshots').upload(name, file, { contentType })
+    if (error) {
+      const dot = name.lastIndexOf('.')
+      name = `${name.slice(0, dot)}-${Date.now().toString(36)}${name.slice(dot)}`
+      const retry = await supabase.storage.from('screenshots').upload(name, file, { contentType })
+      if (retry.error) {
+        setErr(retry.error.message)
+        return null
+      }
+    }
+    return name
+  }
+
+  async function handleFiles(files: Iterable<File>) {
+    const images = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    if (images.length === 0) return
     setBusy(true)
     setErr(null)
-    const { error } = await supabase.storage.from('screenshots').upload(path, file, {
-      contentType: file.type || 'image/png',
-    })
-    setBusy(false)
-    if (error) {
-      setErr(error.message)
-      return
+    for (const f of images) {
+      const name = await uploadImage(f)
+      if (name) insertAtCursor(`\n\n![[${name}]]\n\n`)
     }
-    insertAtCursor(`\n\n![screenshot](storage:${path})\n\n`)
+    setBusy(false)
   }
 
   return (
@@ -130,10 +163,26 @@ export function Editor({
           )}
         </div>
       </div>
+      <div className="folder-field">
+        <span className="folder-icon">📁</span>
+        <input
+          className="folder-input"
+          placeholder="Folder (optional, e.g. Statistics/Chapter 1)"
+          value={folder}
+          onChange={(e) => setFolder(e.target.value)}
+          list="folder-options"
+        />
+        <datalist id="folder-options">
+          {folders.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      </div>
       <p className="hint">
         Obsidian syntax supported: <code>[[wikilinks]]</code>, <code>![[embeds]]</code>,{' '}
-        <code>==highlights==</code>, <code>#tags</code>, <code>&gt; [!note]</code> callouts, and YAML
-        frontmatter (<code>---</code>). Paste markdown from Claude directly, or attach a screenshot below.
+        <code>![[image.png]]</code>, <code>==highlights==</code>, <code>#tags</code>,{' '}
+        <code>&gt; [!note]</code> callouts, and YAML frontmatter. Drag &amp; drop or paste images
+        straight into the editor.
       </p>
       {err && <div className="msg error">{err}</div>}
       {preview ? (
@@ -142,20 +191,36 @@ export function Editor({
         <>
           <textarea
             ref={taRef}
-            className="editor-area"
+            className={'editor-area' + (dragging ? ' dragging' : '')}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="# Start writing in markdown…"
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              void handleFiles(e.dataTransfer.files)
+            }}
+            onPaste={(e) => {
+              if (e.clipboardData.files.length > 0) {
+                e.preventDefault()
+                void handleFiles(e.clipboardData.files)
+              }
+            }}
+            placeholder="# Start writing in markdown… (drop or paste screenshots here)"
           />
           <label className="upload">
             📎 Attach screenshot
             <input
               type="file"
               accept="image/*"
+              multiple
               style={{ display: 'none' }}
               onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) void onUpload(f)
+                if (e.target.files) void handleFiles(e.target.files)
                 e.target.value = ''
               }}
             />

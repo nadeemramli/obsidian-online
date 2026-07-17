@@ -30,12 +30,24 @@ function remarkObsidianInline() {
         if (m.index > last) children.push({ type: 'text', value: value.slice(last, m.index) })
 
         if (embed !== undefined) {
-          const target = embed.split('|')[0].trim()
-          children.push({
-            type: 'link',
-            url: `#/embed/${slugify(target)}`,
-            children: [{ type: 'text', value: target }],
-          })
+          const [rawTarget, alias] = embed.split('|')
+          const target = rawTarget.trim()
+          if (/\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(target)) {
+            // ![[image.png]] or ![[image.png|300]] — an attachment embed.
+            const width = alias && /^\d+$/.test(alias.trim()) ? Number(alias.trim()) : undefined
+            children.push({
+              type: 'image',
+              url: `storage:${target}`,
+              alt: alias && !width ? alias.trim() : target,
+              ...(width ? { data: { hProperties: { width } } } : {}),
+            })
+          } else {
+            children.push({
+              type: 'link',
+              url: `#/embed/${slugify(target)}`,
+              children: [{ type: 'text', value: target }],
+            })
+          }
         } else if (wiki !== undefined) {
           const [rawTarget, alias] = wiki.split('|')
           const target = rawTarget.trim()
@@ -98,7 +110,7 @@ function remarkCallouts() {
   }
 }
 
-function StorageImage({ src, alt }: { src: string; alt?: string }) {
+function StorageImage({ src, alt, ...rest }: { src: string; alt?: string; [k: string]: any }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     let active = true
@@ -114,7 +126,7 @@ function StorageImage({ src, alt }: { src: string; alt?: string }) {
     }
   }, [src])
   if (!url) return <span className="img-loading">[loading image…]</span>
-  return <img src={url} alt={alt || ''} />
+  return <img src={url} alt={alt || ''} {...rest} />
 }
 
 // Renders another note inline for ![[Note]]; one level deep to avoid cycles.
@@ -186,7 +198,7 @@ export function Markdown({
         },
         img({ node, src, alt, ...rest }: any) {
           if (typeof src === 'string' && src.startsWith('storage:')) {
-            return <StorageImage src={src} alt={alt} />
+            return <StorageImage src={src} alt={alt} {...rest} />
           }
           return <img src={src} alt={alt || ''} {...rest} />
         },

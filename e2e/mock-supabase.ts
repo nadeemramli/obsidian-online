@@ -9,6 +9,7 @@ export type MockNote = {
   title: string
   slug: string
   content: string
+  folder: string
   created_at: string
   updated_at: string
 }
@@ -72,11 +73,11 @@ export class MockSupabase {
   notes: MockNote[] = []
   private seq = 0
 
-  seed(items: Array<{ title: string; slug: string; content: string }>) {
+  seed(items: Array<{ title: string; slug: string; content: string; folder?: string }>) {
     for (const it of items) {
       this.seq += 1
       const t = new Date(Date.UTC(2026, 0, 1, 0, this.seq)).toISOString()
-      this.notes.push({ id: `seed-${this.seq}`, created_at: t, updated_at: t, ...it })
+      this.notes.push({ id: `seed-${this.seq}`, created_at: t, updated_at: t, folder: '', ...it })
     }
   }
 
@@ -141,6 +142,7 @@ export class MockSupabase {
           title: body.title || '',
           slug: body.slug || '',
           content: body.content || '',
+          folder: body.folder || '',
           created_at: now,
           updated_at: now,
         }

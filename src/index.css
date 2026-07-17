@@ -247,6 +247,44 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .wikilink:hover { text-decoration: none; border-bottom-color: var(--accent); }
 .wikilink.missing { color: var(--danger); border-bottom-style: dashed; border-bottom-color: rgba(248, 113, 113, 0.5); }
 
+/* Folders */
+.folder-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder-row:hover { background: var(--bg-3); color: var(--text); }
+.folder-chevron { display: inline-block; width: 12px; font-size: 10px; }
+.noteitem-folder { display: block; color: var(--muted); font-size: 11px; }
+
+.folder-field { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.folder-icon { flex: none; }
+.folder-input { max-width: 380px; font-size: 13px; padding: 7px 10px; }
+
+.folder-badge {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 11px;
+  background: var(--bg-3);
+  border-radius: 6px;
+  padding: 1px 7px;
+  margin-bottom: 8px;
+}
+.crumb { font-size: 13px; margin-bottom: -4px; }
+
+.editor-area.dragging { border-color: var(--accent); border-style: dashed; background: var(--bg-2); }
+
 /* Graph view */
 .graph-page { max-width: 1100px; }
 .graph {

@@ -30,6 +30,7 @@ export default function Home() {
           {notes.map((n) => (
             <Link key={n.id} to={`/note/${n.slug}`} className="notecard">
               <h3>{n.title}</h3>
+              {n.folder && <span className="folder-badge">📁 {n.folder}</span>}
               <p>{excerpt(n.content)}</p>
               <span className="date">{new Date(n.updated_at).toLocaleString()}</span>
             </Link>
