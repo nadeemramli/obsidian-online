@@ -36,7 +36,7 @@ test.describe('note CRUD and markdown rendering', () => {
     await login(page)
     await page.getByRole('link', { name: '+ New note' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByText('Please add a title.')).toBeVisible()
+    await expect(page.getByText(/Please add a title/)).toBeVisible()
   })
 
   test('preview toggle renders markdown while editing', async ({ page, mock }) => {

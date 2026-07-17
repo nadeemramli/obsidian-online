@@ -9,6 +9,7 @@ import NoteView from './pages/NoteView'
 import NoteEdit from './pages/NoteEdit'
 import NewNote from './pages/NewNote'
 import Settings from './pages/Settings'
+import Graph from './pages/Graph'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             >
               <Route path="/" element={<Home />} />
               <Route path="/new" element={<NewNote />} />
+            <Route path="/graph" element={<Graph />} />
               <Route path="/note/:slug" element={<NoteView />} />
               <Route path="/note/:slug/edit" element={<NoteEdit />} />
               <Route path="/settings" element={<Settings />} />

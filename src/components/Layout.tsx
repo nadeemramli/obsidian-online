@@ -26,6 +26,9 @@ export function Layout() {
           <Link className="btn primary block" to="/new">
             + New note
           </Link>
+          <Link className="btn block" to="/graph">
+            🕸 Graph
+          </Link>
         </div>
         <input
           className="search"

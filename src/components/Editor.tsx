@@ -4,6 +4,17 @@ import { createNote, deleteNote, updateNote, type Note } from '../lib/notes'
 import { useNotes } from '../lib/notesContext'
 import { supabase } from '../lib/supabase'
 import { NoteContent } from '../lib/markdown'
+import { parseFrontmatter } from '../lib/frontmatter'
+
+// Pasted markdown often already names itself — via frontmatter `title:` or a
+// leading heading. Use that when the title field was left empty.
+export function deriveTitle(content: string): string {
+  const { data, body } = parseFrontmatter(content)
+  if (typeof data.title === 'string' && data.title.trim()) return data.title.trim()
+  const heading = body.match(/^#{1,6}\s+(.+)$/m)
+  if (heading) return heading[1].replace(/[#*_`=[\]]/g, '').trim()
+  return ''
+}
 
 export function Editor({
   existing,
@@ -18,13 +29,21 @@ export function Editor({
   const [preview, setPreview] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const { notes, reload } = useNotes()
   const knownSlugs = useMemo(() => new Set(notes.map((n) => n.slug)), [notes])
 
   async function save() {
-    if (!title.trim()) {
-      setErr('Please add a title.')
+    let finalTitle = title.trim()
+    if (!finalTitle) {
+      finalTitle = deriveTitle(content)
+      if (finalTitle) setTitle(finalTitle)
+    }
+    if (!finalTitle) {
+      setErr('Please add a title (the field at the top), or start your note with a # heading.')
+      setPreview(false)
+      titleRef.current?.focus()
       return
     }
     setBusy(true)
@@ -32,10 +51,10 @@ export function Editor({
     try {
       let slug: string
       if (existing) {
-        const n = await updateNote(existing.id, { title, content })
+        const n = await updateNote(existing.id, { title: finalTitle, content })
         slug = n.slug
       } else {
-        const n = await createNote(title, content)
+        const n = await createNote(finalTitle, content)
         slug = n.slug
       }
       await reload()
@@ -91,8 +110,9 @@ export function Editor({
     <div className="page editor">
       <div className="page-head">
         <input
+          ref={titleRef}
           className="title-input"
-          placeholder="Note title"
+          placeholder="Note title (or leave blank — I'll use the frontmatter/heading)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
