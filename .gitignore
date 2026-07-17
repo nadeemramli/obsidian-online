@@ -10,3 +10,8 @@ dist-ssr
 
 # scratch / verification files
 signin.mjs
+
+# playwright
+test-results
+playwright-report
+blob-report

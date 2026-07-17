@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
 import { slugify } from './notes'
@@ -69,6 +69,9 @@ export function Markdown({
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkWikilinks]}
+      // react-markdown sanitizes non-http(s) URLs; keep our storage: scheme
+      // so StorageImage can resolve it to a signed URL.
+      urlTransform={(url) => (url.startsWith('storage:') ? url : defaultUrlTransform(url))}
       components={{
         a({ node, href, children, ...rest }: any) {
           if (typeof href === 'string' && href.startsWith('#/note/')) {
