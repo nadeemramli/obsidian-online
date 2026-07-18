@@ -44,6 +44,12 @@ function Outline({ headings }: { headings: Heading[] }) {
     let raf = 0
     const measure = () => {
       raf = 0
+      // Fully scrolled: the last section is being read even though its
+      // heading can never reach the container top.
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+        setActive(headings[headings.length - 1].id)
+        return
+      }
       const containerTop = container.getBoundingClientRect().top
       let current = headings[0].id
       for (const h of headings) {
