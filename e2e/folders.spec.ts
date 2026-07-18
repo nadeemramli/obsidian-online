@@ -31,6 +31,17 @@ test.describe('folder system', () => {
     await expect(list.getByText('Sampling')).toBeVisible()
   })
 
+  test('notes inside a folder stack vertically, not side by side', async ({ page, mock }) => {
+    await login(page)
+    const list = page.locator('.notelist')
+    const sampling = await list.getByText('Sampling').boundingBox()
+    const bayes = await list.getByText('Bayes').boundingBox()
+    expect(sampling && bayes).toBeTruthy()
+    expect(sampling!.x).toBe(bayes!.x) // same indent
+    expect(sampling!.y).not.toBe(bayes!.y) // stacked, no horizontal overflow
+    expect(sampling!.width).toBeLessThanOrEqual(280) // fits the sidebar
+  })
+
   test('creating a note with a folder files it in the tree and shows a breadcrumb', async ({
     page,
     mock,

@@ -105,6 +105,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .search { flex: none; }
 .notelist { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .noteitem {
+  display: block;
   color: var(--text);
   padding: 7px 10px;
   border-radius: 7px;
