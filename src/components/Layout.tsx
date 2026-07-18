@@ -11,6 +11,16 @@ type FolderNode = {
   notes: Note[]
 }
 
+// Natural A→Z: numeric-aware so "02 — …" sorts before "10 — …".
+function byTitle(a: Note, b: Note): number {
+  return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function sortTree(node: FolderNode) {
+  node.notes.sort(byTitle)
+  node.folders.forEach(sortTree)
+}
+
 function buildTree(notes: Note[]): FolderNode {
   const root: FolderNode = { name: '', path: '', folders: new Map(), notes: [] }
   for (const n of notes) {
@@ -29,6 +39,7 @@ function buildTree(notes: Note[]): FolderNode {
     }
     cur.notes.push(n)
   }
+  sortTree(root)
   return root
 }
 

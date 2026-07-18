@@ -31,6 +31,32 @@ test.describe('folder system', () => {
     await expect(list.getByText('Sampling')).toBeVisible()
   })
 
+  test('folder notes sort A→Z with numeric-aware ordering', async ({ page, mock }) => {
+    mock.seed([
+      { title: '10 — Control and Audit', slug: 'ch-10', content: 'x', folder: 'FBT' },
+      { title: '02 — The Business Environment', slug: 'ch-02', content: 'x', folder: 'FBT' },
+      { title: 'FBT — Course Summary', slug: 'summary', content: 'x', folder: 'FBT' },
+      { title: '05 — Micro-economic Factors', slug: 'ch-05', content: 'x', folder: 'FBT' },
+    ])
+    await login(page)
+    const items = page.locator('.notelist .noteitem')
+    // Statistics folder sorts alphabetically too: Bayes before Sampling.
+    await expect(items).toHaveText([
+      // Books/Stats 101
+      'Chapter 1',
+      // FBT — numeric-aware: 02 < 05 < 10, letters after numbers
+      '02 — The Business Environment',
+      '05 — Micro-economic Factors',
+      '10 — Control and Audit',
+      'FBT — Course Summary',
+      // Statistics
+      'Bayes',
+      'Sampling',
+      // vault root
+      'Inbox Note',
+    ])
+  })
+
   test('notes inside a folder stack vertically, not side by side', async ({ page, mock }) => {
     await login(page)
     const list = page.locator('.notelist')
