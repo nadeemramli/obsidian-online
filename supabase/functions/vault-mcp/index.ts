@@ -12,7 +12,18 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 )
 
-const SERVER_INFO = { name: 'vault-mcp', version: '1.1.0' }
+const SERVER_INFO = { name: 'vault-mcp', version: '1.2.0' }
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
+
+function sanitizeImageName(name: string): string {
+  const clean = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-]+$/g, '')
+  return clean || 'image'
+}
 
 const TOOLS = [
   {
@@ -85,6 +96,28 @@ const TOOLS = [
       type: 'object',
       properties: { slug: { type: 'string', description: 'Slug of the note to delete' } },
       required: ['slug'],
+    },
+  },
+  {
+    name: 'save_image',
+    description:
+      'Upload an image to the vault (private storage). Returns the markdown link — reference it in notes as ![[name.png]] (or ![[name.png|300]] for a fixed width).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Filename, e.g. "sampling-diagram.png"' },
+        base64: { type: 'string', description: 'Base64-encoded image bytes (no data: URL prefix)' },
+        content_type: { type: 'string', description: 'MIME type (default image/png)' },
+      },
+      required: ['name', 'base64'],
+    },
+  },
+  {
+    name: 'list_images',
+    description: 'List images stored in the vault, so notes can reference existing ones with ![[name]].',
+    inputSchema: {
+      type: 'object',
+      properties: { limit: { type: 'number', description: 'Max images to return (default 100)' } },
     },
   },
 ]
@@ -163,6 +196,39 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       if (error) throw new Error(error.message)
       if (!data || data.length === 0) throw new Error(`No note with slug "${args.slug}"`)
       return { deleted: String(args.slug) }
+    }
+    case 'save_image': {
+      let name = sanitizeImageName(String(args.name || 'image.png'))
+      if (!IMAGE_EXT_RE.test(name)) name += '.png'
+      const contentType = typeof args.content_type === 'string' ? args.content_type : 'image/png'
+      let bytes: Uint8Array
+      try {
+        bytes = Uint8Array.from(atob(String(args.base64).replace(/^data:[^,]+,/, '')), (c) =>
+          c.charCodeAt(0),
+        )
+      } catch {
+        throw new Error('base64 could not be decoded')
+      }
+      let { error } = await supabase.storage.from('screenshots').upload(name, bytes, { contentType })
+      if (error) {
+        const dot = name.lastIndexOf('.')
+        name = `${name.slice(0, dot)}-${Date.now().toString(36)}${name.slice(dot)}`
+        const retry = await supabase.storage.from('screenshots').upload(name, bytes, { contentType })
+        if (retry.error) throw new Error(retry.error.message)
+      }
+      return { name, markdown: `![[${name}]]`, bytes: bytes.length }
+    }
+    case 'list_images': {
+      const { data, error } = await supabase.storage
+        .from('screenshots')
+        .list('', { limit: Number(args.limit) || 100, sortBy: { column: 'created_at', order: 'desc' } })
+      if (error) throw new Error(error.message)
+      return data?.map((f) => ({
+        name: f.name,
+        markdown: `![[${f.name}]]`,
+        size: f.metadata?.size,
+        created_at: f.created_at,
+      }))
     }
     default:
       throw new Error(`Unknown tool: ${name}`)
