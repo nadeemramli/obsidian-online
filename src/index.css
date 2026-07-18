@@ -373,6 +373,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
   text-overflow: ellipsis;
 }
 .outline-item:hover { background: var(--bg-3); color: var(--text); }
+.outline-item.active { color: var(--accent); background: rgba(167, 139, 250, 0.1); font-weight: 600; }
 .local-graph { width: 100%; height: auto; }
 .local-graph .graph-node text { font-size: 10px; fill: var(--muted); text-anchor: middle; pointer-events: none; }
 .local-graph .graph-node.missing circle { fill: none; stroke: var(--danger); stroke-dasharray: 3 2; }

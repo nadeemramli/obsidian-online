@@ -53,11 +53,16 @@ test.describe('note right rail', () => {
 
     const scrollTop = () => page.locator('main.content').evaluate((el) => el.scrollTop)
     expect(await scrollTop()).toBe(0)
+    // Scroll-spy: at the top, the first heading is active.
+    await expect(outline.locator('.outline-item.active')).toHaveText('Overview')
+
     await outline.locator('.outline-item', { hasText: 'Results' }).click()
     await expect
       .poll(scrollTop, { timeout: 5000 })
       .toBeGreaterThan(200)
     await expect(page.locator('article.markdown h2#h-3')).toBeInViewport()
+    // Scroll-spy follows: Results is now the active section.
+    await expect(outline.locator('.outline-item.active')).toHaveText('Results')
   })
 
   test('local graph shows outgoing links, backlinks, and missing notes', async ({ page, mock }) => {

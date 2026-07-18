@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { extractWikilinks, findBacklinks, slugify, type Note } from '../lib/notes'
 import { folderColorMap, topFolder, OVERFLOW_COLOR } from '../lib/graphLayout'
@@ -33,6 +33,38 @@ export function parseHeadings(content: string): Heading[] {
 }
 
 function Outline({ headings }: { headings: Heading[] }) {
+  const [active, setActive] = useState<string | null>(null)
+
+  // Scroll-spy: the active section is the last heading at or above the top
+  // of the scroll container (with a small reading offset).
+  useEffect(() => {
+    if (headings.length === 0) return
+    const container = document.querySelector('main.content')
+    if (!container) return
+    let raf = 0
+    const measure = () => {
+      raf = 0
+      const containerTop = container.getBoundingClientRect().top
+      let current = headings[0].id
+      for (const h of headings) {
+        const el = document.getElementById(h.id)
+        if (!el) continue
+        if (el.getBoundingClientRect().top - containerTop <= 90) current = h.id
+        else break
+      }
+      setActive(current)
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(measure)
+    }
+    measure()
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(raf)
+    }
+  }, [headings])
+
   if (headings.length === 0) return null
   const minLevel = Math.min(...headings.map((h) => h.level))
   return (
@@ -42,7 +74,7 @@ function Outline({ headings }: { headings: Heading[] }) {
         {headings.map((h) => (
           <li key={h.id} style={{ paddingLeft: (h.level - minLevel) * 12 }}>
             <button
-              className="outline-item"
+              className={'outline-item' + (active === h.id ? ' active' : '')}
               onClick={() =>
                 document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }
