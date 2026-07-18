@@ -56,7 +56,7 @@ test.describe('note CRUD and markdown rendering', () => {
     await page.locator('.notelist').getByText('Alpha').click()
     await expect(page.getByText('original text')).toBeVisible()
 
-    await page.getByRole('link', { name: 'Edit' }).click()
+    await page.getByRole('link', { name: 'Details' }).click()
     await page.getByPlaceholder('# Start writing in markdown…').fill('revised text')
     await page.getByRole('button', { name: 'Save' }).click()
 
@@ -69,7 +69,7 @@ test.describe('note CRUD and markdown rendering', () => {
     mock.seed([{ title: 'Disposable', slug: 'disposable', content: 'to be removed' }])
     await login(page)
     await page.locator('.notelist').getByText('Disposable').click()
-    await page.getByRole('link', { name: 'Edit' }).click()
+    await page.getByRole('link', { name: 'Details' }).click()
 
     page.on('dialog', (d) => d.accept())
     await page.getByRole('button', { name: 'Delete' }).click()

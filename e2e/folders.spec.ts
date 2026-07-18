@@ -86,7 +86,7 @@ test.describe('folder system', () => {
   test('editing a note can move it to another folder', async ({ page, mock }) => {
     await login(page)
     await page.locator('.notelist').getByText('Inbox Note').click()
-    await page.getByRole('link', { name: 'Edit' }).click()
+    await page.getByRole('link', { name: 'Details' }).click()
     await page.getByPlaceholder('Folder (optional', { exact: false }).fill('Archive')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.locator('.crumb')).toHaveText('📁 Archive')

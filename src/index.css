@@ -326,6 +326,15 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
+/* Inline live editor (CodeMirror) */
+.md-editor { min-height: 50vh; }
+.md-editor .cm-editor { min-height: 50vh; }
+.cm-wikilink { color: var(--accent); }
+.cm-hl { background: rgba(250, 204, 21, 0.28); border-radius: 3px; }
+.cm-tag { color: var(--accent); }
+.save-state { color: var(--muted); font-size: 12.5px; align-self: center; }
+.save-state.error { color: var(--danger); }
+
 /* Note right rail: outline + local graph */
 .note-layout { display: flex; align-items: flex-start; }
 .note-main { flex: 1; min-width: 0; }

@@ -2,9 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createNote, deleteNote, updateNote, type Note } from '../lib/notes'
 import { useNotes } from '../lib/notesContext'
-import { supabase } from '../lib/supabase'
 import { NoteContent } from '../lib/markdown'
 import { parseFrontmatter } from '../lib/frontmatter'
+import { uploadImage, imageFiles } from '../lib/images'
 
 // Pasted markdown often already names itself — via frontmatter `title:` or a
 // leading heading. Use that when the title field was left empty.
@@ -14,17 +14,6 @@ export function deriveTitle(content: string): string {
   const heading = body.match(/^#{1,6}\s+(.+)$/m)
   if (heading) return heading[1].replace(/[#*_`=[\]]/g, '').trim()
   return ''
-}
-
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
-
-function sanitizeImageName(name: string): string {
-  const clean = name
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-.]+|[-]+$/g, '')
-  return clean || 'image'
 }
 
 export function Editor({
@@ -107,34 +96,17 @@ export function Editor({
     setContent((c) => c.slice(0, start) + text + c.slice(end))
   }
 
-  // Upload keeping a readable filename so notes read like Obsidian:
-  // ![[sampling-diagram.png]]. On a name collision, add a short suffix.
-  async function uploadImage(file: File): Promise<string | null> {
-    let name = sanitizeImageName(file.name || 'pasted-image.png')
-    if (!IMAGE_EXT_RE.test(name)) name += '.png'
-    const contentType = file.type || 'image/png'
-
-    let { error } = await supabase.storage.from('screenshots').upload(name, file, { contentType })
-    if (error) {
-      const dot = name.lastIndexOf('.')
-      name = `${name.slice(0, dot)}-${Date.now().toString(36)}${name.slice(dot)}`
-      const retry = await supabase.storage.from('screenshots').upload(name, file, { contentType })
-      if (retry.error) {
-        setErr(retry.error.message)
-        return null
-      }
-    }
-    return name
-  }
-
   async function handleFiles(files: Iterable<File>) {
-    const images = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const images = imageFiles(files)
     if (images.length === 0) return
     setBusy(true)
     setErr(null)
     for (const f of images) {
-      const name = await uploadImage(f)
-      if (name) insertAtCursor(`\n\n![[${name}]]\n\n`)
+      try {
+        insertAtCursor(`\n\n![[${await uploadImage(f)}]]\n\n`)
+      } catch (e: any) {
+        setErr(e.message || 'Upload failed')
+      }
     }
     setBusy(false)
   }

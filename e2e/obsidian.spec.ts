@@ -91,7 +91,7 @@ test.describe('Obsidian formatting', () => {
   test('editor preview shows the properties panel too', async ({ page, mock }) => {
     await login(page)
     await page.locator('.notelist').getByText('Sampling').click()
-    await page.getByRole('link', { name: 'Edit' }).click()
+    await page.getByRole('link', { name: 'Details' }).click()
     await page.getByRole('button', { name: 'Preview' }).click()
     await expect(page.locator('section.props').getByText('Statistics for Dummies')).toBeVisible()
     await expect(page.locator('article.markdown blockquote.callout')).toBeVisible()

@@ -32,7 +32,7 @@ test.describe('live backend smoke', () => {
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Live check' })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Edit' }).click()
+    await page.getByRole('link', { name: 'Details' }).click()
     page.on('dialog', (d) => d.accept())
     await page.getByRole('button', { name: 'Delete' }).click()
     await expect(page.getByRole('heading', { name: 'All notes' })).toBeVisible({ timeout: 15_000 })
