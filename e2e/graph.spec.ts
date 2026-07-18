@@ -52,6 +52,71 @@ test.describe('graph view', () => {
     await expect(page.getByRole('heading', { name: 'Beta' })).toBeVisible()
   })
 
+  test('zoom buttons and reset change the viewport transform', async ({ page, mock }) => {
+    await login(page)
+    await page.getByRole('link', { name: 'Graph' }).click()
+
+    const viewport = page.locator('svg.graph > g').first()
+    const before = await viewport.getAttribute('transform')
+    await page.getByRole('button', { name: 'Zoom in' }).click()
+    const zoomed = await viewport.getAttribute('transform')
+    expect(zoomed).not.toBe(before)
+    await page.getByRole('button', { name: 'Reset view' }).click()
+    const reset = await viewport.getAttribute('transform')
+    expect(reset).not.toBe(zoomed)
+  })
+
+  test('dragging the background pans the graph', async ({ page, mock }) => {
+    await login(page)
+    await page.getByRole('link', { name: 'Graph' }).click()
+
+    const svg = page.locator('svg.graph')
+    const viewport = page.locator('svg.graph > g').first()
+    const before = await viewport.getAttribute('transform')
+    const box = (await svg.boundingBox())!
+    // Top-left corner: inside the window viewport and clear of nodes
+    // (content is centered by fitToView).
+    await page.mouse.move(box.x + 15, box.y + 15)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 135, box.y + 85, { steps: 5 })
+    await page.mouse.up()
+    expect(await viewport.getAttribute('transform')).not.toBe(before)
+  })
+
+  test('dragging a node moves it without opening the note', async ({ page, mock }) => {
+    await login(page)
+    await page.getByRole('link', { name: 'Graph' }).click()
+    // Let the simulation settle so drift doesn't confound the assertion.
+    await page.waitForTimeout(700)
+
+    const node = page.locator('g.graph-node[data-slug="island"]')
+    const before = (await node.boundingBox())!
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2 + 8)
+    await page.mouse.down()
+    await page.mouse.move(before.x + before.width / 2 + 90, before.y + before.height / 2 + 68, {
+      steps: 8,
+    })
+    await page.mouse.up()
+
+    await expect(page).toHaveURL(/#\/graph$/) // still on the graph — a drag is not a click
+    const after = (await node.boundingBox())!
+    const dist = Math.hypot(after.x - before.x, after.y - before.y)
+    expect(dist).toBeGreaterThan(30)
+  })
+
+  test('the filter box dims non-matching nodes', async ({ page, mock }) => {
+    await login(page)
+    await page.getByRole('link', { name: 'Graph' }).click()
+
+    await page.getByPlaceholder('Filter notes…').fill('beta')
+    await expect(page.locator('g.graph-node[data-slug="beta"]')).not.toHaveClass(/dim/)
+    await expect(page.locator('g.graph-node[data-slug="alpha"]')).toHaveClass(/dim/)
+    await expect(page.locator('g.graph-node[data-slug="island"]')).toHaveClass(/dim/)
+
+    await page.getByPlaceholder('Filter notes…').clear()
+    await expect(page.locator('g.graph-node[data-slug="alpha"]')).not.toHaveClass(/dim/)
+  })
+
   test('shows an empty state without notes', async ({ page, mock }) => {
     mock.notes = []
     await login(page)
