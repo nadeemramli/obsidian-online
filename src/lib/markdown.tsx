@@ -170,6 +170,18 @@ export function Markdown({
   knownSlugs: Set<string>
   depth?: number
 }) {
+  // Sequential heading anchors (h-0, h-1, …) for the outline rail. Only the
+  // top-level note gets them — embedded notes would duplicate ids.
+  const headingCounter = { n: 0 }
+  const heading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') =>
+    function Heading({ node, children, ...rest }: any) {
+      const id = depth === 0 ? `h-${headingCounter.n++}` : undefined
+      return (
+        <Tag id={id} {...rest}>
+          {children}
+        </Tag>
+      )
+    }
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkObsidianInline, remarkCallouts]}
@@ -177,6 +189,12 @@ export function Markdown({
       // so StorageImage can resolve it to a signed URL.
       urlTransform={(url) => (url.startsWith('storage:') ? url : defaultUrlTransform(url))}
       components={{
+        h1: heading('h1'),
+        h2: heading('h2'),
+        h3: heading('h3'),
+        h4: heading('h4'),
+        h5: heading('h5'),
+        h6: heading('h6'),
         a({ node, href, children, ...rest }: any) {
           if (typeof href === 'string' && href.startsWith('#/embed/')) {
             return <NoteEmbed slug={href.replace('#/embed/', '')} depth={depth} />

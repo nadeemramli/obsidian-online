@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { NoteContent } from '../lib/markdown'
 import { findBacklinks } from '../lib/notes'
+import { NoteRail } from '../components/NoteRail'
 
 export default function NoteView() {
   const { slug } = useParams()
@@ -27,31 +28,34 @@ export default function NoteView() {
   }
 
   return (
-    <div className="page">
-      {note.folder && <div className="crumb muted">📁 {note.folder}</div>}
-      <div className="page-head">
-        <h1>{note.title}</h1>
-        <div className="head-actions">
-          <Link className="btn" to={`/note/${note.slug}/edit`}>
-            Edit
-          </Link>
+    <div className="note-layout">
+      <div className="page note-main">
+        {note.folder && <div className="crumb muted">📁 {note.folder}</div>}
+        <div className="page-head">
+          <h1>{note.title}</h1>
+          <div className="head-actions">
+            <Link className="btn" to={`/note/${note.slug}/edit`}>
+              Edit
+            </Link>
+          </div>
         </div>
+        <NoteContent content={note.content} knownSlugs={knownSlugs} />
+        <section className="backlinks">
+          <h3>Linked from ({backlinks.length})</h3>
+          {backlinks.length === 0 ? (
+            <p className="muted">No other notes link here yet.</p>
+          ) : (
+            <ul>
+              {backlinks.map((b) => (
+                <li key={b.id}>
+                  <Link to={`/note/${b.slug}`}>{b.title}</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-      <NoteContent content={note.content} knownSlugs={knownSlugs} />
-      <section className="backlinks">
-        <h3>Linked from ({backlinks.length})</h3>
-        {backlinks.length === 0 ? (
-          <p className="muted">No other notes link here yet.</p>
-        ) : (
-          <ul>
-            {backlinks.map((b) => (
-              <li key={b.id}>
-                <Link to={`/note/${b.slug}`}>{b.title}</Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <NoteRail note={note} notes={notes} />
     </div>
   )
 }
