@@ -229,9 +229,10 @@ function followWikilink(e: MouseEvent, view: EditorView): boolean {
 
 const theme = EditorView.theme(
   {
-    '&': { fontSize: '15.5px', backgroundColor: 'transparent' },
-    // CodeMirror defaults .cm-scroller to monospace; notes read in the app sans.
-    '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.65' },
+    '&': { fontSize: '17px', backgroundColor: 'transparent' },
+    // CodeMirror defaults .cm-scroller to monospace; the editor reads in the
+    // same book serif as the reading view (inherited from .md-editor).
+    '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.75' },
     '.cm-content': {
       padding: '4px 0 40vh',
       caretColor: 'var(--accent)',

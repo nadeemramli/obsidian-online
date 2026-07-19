@@ -10,6 +10,9 @@
   --accent-2: #7c5cff;
   --danger: #f87171;
   --link: #8ab4ff;
+  /* Reading face: screen serifs every OS ships with — no font downloads. */
+  --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -17,11 +20,24 @@
 html, body, #root { height: 100%; margin: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--sans);
   background: var(--bg);
   color: var(--text);
   font-size: 15px;
   line-height: 1.6;
+}
+
+/* Slim dark scrollbars so the chrome stays quiet. */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Keyboard focus is visible; mouse focus stays quiet. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
 a { color: var(--link); text-decoration: none; }
@@ -115,6 +131,11 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
   text-overflow: ellipsis;
 }
 .noteitem:hover { background: var(--bg-3); text-decoration: none; }
+.noteitem.current {
+  background: rgba(167, 139, 250, 0.12);
+  box-shadow: inset 2px 0 0 var(--accent);
+  color: var(--text);
+}
 .empty { color: var(--muted); font-size: 13px; padding: 8px 10px; }
 .sidebar-foot {
   border-top: 1px solid var(--border);
@@ -173,24 +194,57 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 }
 .upload:hover { color: var(--text); border-color: var(--accent); }
 
-/* Markdown rendering */
-.markdown { font-size: 15.5px; }
-.markdown h1, .markdown h2, .markdown h3 { line-height: 1.3; margin: 1.4em 0 0.5em; }
-.markdown h1 { font-size: 26px; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.markdown h2 { font-size: 21px; }
-.markdown h3 { font-size: 17px; }
-.markdown p { margin: 0.7em 0; }
+/* Markdown rendering — the reading pane is set like a book page. */
+.markdown {
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.75;
+  letter-spacing: 0.004em;
+}
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 {
+  font-family: var(--serif);
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  margin: 1.7em 0 0.5em;
+}
+.markdown h1 { font-size: 28px; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 0.35em; }
+.markdown h2 { font-size: 23px; font-weight: 700; }
+.markdown h3 { font-size: 19px; font-weight: 700; }
+.markdown > *:first-child, .markdown > :first-child h1 { margin-top: 0.4em; }
+.markdown p { margin: 0.85em 0; }
 .markdown ul, .markdown ol { padding-left: 1.5em; }
-.markdown li { margin: 0.2em 0; }
-.markdown code { background: var(--bg-3); padding: 2px 6px; border-radius: 5px; font-size: 0.88em; }
-.markdown pre { background: var(--bg-3); padding: 14px 16px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); }
-.markdown pre code { background: none; padding: 0; }
-.markdown blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding: 0.2em 1em; color: var(--muted); background: var(--bg-2); border-radius: 0 8px 8px 0; }
-.markdown table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+.markdown li { margin: 0.3em 0; }
+.markdown code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  background: var(--bg-3);
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 0.82em;
+}
+.markdown pre { background: var(--bg-3); padding: 14px 16px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); font-size: 14px; line-height: 1.6; }
+.markdown pre code { background: none; padding: 0; font-size: inherit; }
+.markdown blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1.2em 0;
+  padding: 0.2em 1.1em;
+  color: var(--muted);
+  background: var(--bg-2);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+}
+.markdown blockquote.callout { font-style: normal; }
+.markdown table { border-collapse: collapse; width: 100%; margin: 1.2em 0; font-family: var(--sans); font-size: 14.5px; line-height: 1.55; }
 .markdown th, .markdown td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
 .markdown th { background: var(--bg-3); }
 .markdown img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); margin: 0.6em 0; }
-.markdown hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
+.markdown hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+.markdown a { text-underline-offset: 3px; }
+
+/* The note title joins the reading page's typography. */
+.note-main .page-head h1 { font-family: var(--serif); font-size: 32px; letter-spacing: -0.012em; }
+
+/* Chrome inside the serif page stays sans. */
+.markdown .tag, .props, .embed-title { font-family: var(--sans); }
 .img-loading { color: var(--muted); font-size: 13px; }
 
 /* Mermaid diagrams */
@@ -368,7 +422,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
 /* Inline live editor (CodeMirror) */
-.md-editor { min-height: 50vh; }
+.md-editor { min-height: 50vh; font-family: var(--serif); }
 .md-editor .cm-editor { min-height: 50vh; }
 .cm-wikilink { color: var(--accent); }
 .cm-image { display: inline-block; max-width: 100%; }

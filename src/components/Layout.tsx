@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { compareTitles, type Note } from '../lib/notes'
 import { parseFrontmatter } from '../lib/frontmatter'
@@ -84,14 +84,14 @@ function FolderBranch({
         )
       })}
       {node.notes.map((n) => (
-        <Link
+        <NavLink
           key={n.id}
           to={`/note/${n.slug}`}
-          className="noteitem"
+          className={({ isActive }) => 'noteitem' + (isActive ? ' current' : '')}
           style={{ paddingLeft: 10 + depth * 14 }}
         >
           {n.title}
-        </Link>
+        </NavLink>
       ))}
     </>
   )
@@ -184,10 +184,14 @@ function LayoutInner() {
           {searching ? (
             // Flat results while searching — folders would hide matches.
             filtered.map((n) => (
-              <Link key={n.id} to={`/note/${n.slug}`} className="noteitem">
+              <NavLink
+                key={n.id}
+                to={`/note/${n.slug}`}
+                className={({ isActive }) => 'noteitem' + (isActive ? ' current' : '')}
+              >
                 {n.title}
                 {n.folder && <span className="noteitem-folder">{n.folder}</span>}
-              </Link>
+              </NavLink>
             ))
           ) : (
             <FolderBranch node={tree} depth={0} collapsed={collapsed} toggle={toggle} />
