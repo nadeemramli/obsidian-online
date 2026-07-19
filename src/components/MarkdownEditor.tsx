@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { EditorView, keymap, drawSelection, highlightActiveLine, ViewPlugin, ViewUpdate, Decoration, DecorationSet, MatchDecorator } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorView, keymap, drawSelection, highlightActiveLine, ViewPlugin, ViewUpdate, Decoration, DecorationSet, MatchDecorator, WidgetType } from '@codemirror/view'
+import { EditorState, type Range } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
-import { uploadImage, imageFiles } from '../lib/images'
+import { uploadImage, imageFiles, IMAGE_EXT_RE } from '../lib/images'
+import { supabase } from '../lib/supabase'
 
 // Live syntax styling — the raw markdown stays the document (like Obsidian's
 // editor); formatting is applied visually as you type.
@@ -45,6 +46,103 @@ const obsidianSyntax = ViewPlugin.fromClass(
     }
     update(u: ViewUpdate) {
       this.decorations = obsidianDecorator.updateDeco(u, this.decorations)
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
+
+// ---- Live preview: images render inline while editing (Obsidian-style).
+// The raw syntax reappears whenever the cursor is on that line.
+
+const signedUrlCache = new Map<string, Promise<string>>()
+function signedUrl(name: string): Promise<string> {
+  if (!signedUrlCache.has(name)) {
+    signedUrlCache.set(
+      name,
+      supabase.storage
+        .from('screenshots')
+        .createSignedUrl(name, 3600)
+        .then(({ data, error }) => {
+          if (error || !data) throw error ?? new Error('no url')
+          return data.signedUrl
+        }),
+    )
+  }
+  return signedUrlCache.get(name)!
+}
+
+class ImageWidget extends WidgetType {
+  constructor(
+    readonly name: string,
+    readonly width?: number,
+  ) {
+    super()
+  }
+  eq(other: ImageWidget) {
+    return other.name === this.name && other.width === this.width
+  }
+  toDOM() {
+    const wrap = document.createElement('span')
+    wrap.className = 'cm-image'
+    const img = document.createElement('img')
+    img.alt = this.name
+    if (this.width) img.width = this.width
+    img.onerror = () => {
+      wrap.classList.add('broken')
+      wrap.textContent = `[image not found: ${this.name}]`
+    }
+    signedUrl(this.name)
+      .then((u) => {
+        img.src = u
+      })
+      .catch(() => {
+        wrap.classList.add('broken')
+        wrap.textContent = `[image not found: ${this.name}]`
+      })
+    wrap.appendChild(img)
+    return wrap
+  }
+  ignoreEvent() {
+    return false
+  }
+}
+
+// ![[name.png]] / ![[name.png|300]] / legacy ![alt](storage:name.png)
+const IMG_MD_RE = /!\[\[([^\]\n|]+?)(?:\|(\d+))?\]\]|!\[[^\]\n]*\]\(storage:([^)\n]+)\)/g
+
+function buildImageDecos(view: EditorView): DecorationSet {
+  const widgets: Array<Range<Decoration>> = []
+  const { state } = view
+  for (const { from, to } of view.visibleRanges) {
+    const text = state.doc.sliceString(from, to)
+    IMG_MD_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = IMG_MD_RE.exec(text)) !== null) {
+      const name = (m[1] ?? m[3]).trim()
+      if (!IMAGE_EXT_RE.test(name)) continue
+      const absFrom = from + m.index
+      const absTo = absFrom + m[0].length
+      const line = state.doc.lineAt(absFrom)
+      // Cursor (or selection) on this line → show the raw syntax instead.
+      const cursorHere = state.selection.ranges.some((r) => r.from <= line.to && r.to >= line.from)
+      if (cursorHere) continue
+      const width = m[2] ? Number(m[2]) : undefined
+      widgets.push(Decoration.replace({ widget: new ImageWidget(name, width) }).range(absFrom, absTo))
+    }
+  }
+  return Decoration.set(widgets, true)
+}
+
+const imagePreview = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = buildImageDecos(view)
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.selectionSet || u.viewportChanged) {
+        this.decorations = buildImageDecos(u.view)
+      }
     }
   },
   { decorations: (v) => v.decorations },
@@ -110,6 +208,7 @@ export function MarkdownEditor({
           markdown({ base: markdownLanguage }),
           syntaxHighlighting(headingStyles),
           obsidianSyntax,
+          imagePreview,
           theme,
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((u) => {

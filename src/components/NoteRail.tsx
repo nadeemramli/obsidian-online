@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { extractWikilinks, findBacklinks, slugify, type Note } from '../lib/notes'
 import { folderColorMap, topFolder, OVERFLOW_COLOR } from '../lib/graphLayout'
 import { parseFrontmatter } from '../lib/frontmatter'
+import { IMAGE_EXT_RE } from '../lib/images'
 
 type Heading = { text: string; level: number; id: string }
 
@@ -109,6 +110,7 @@ function LocalGraph({ note, notes }: { note: Note; notes: Note[] }) {
     const out = new Map<string, Note>()
     const miss = new Set<string>()
     for (const link of extractWikilinks(note.content)) {
+      if (IMAGE_EXT_RE.test(link.trim())) continue // image embeds aren't note links
       const slug = slugify(link)
       if (slug === note.slug) continue
       const target = bySlug.get(slug)

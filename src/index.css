@@ -330,6 +330,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .md-editor { min-height: 50vh; }
 .md-editor .cm-editor { min-height: 50vh; }
 .cm-wikilink { color: var(--accent); }
+.cm-image { display: inline-block; max-width: 100%; }
+.cm-image img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); margin: 0.4em 0; vertical-align: top; }
+.cm-image.broken { color: var(--danger); font-size: 13px; }
 .cm-hl { background: rgba(250, 204, 21, 0.28); border-radius: 3px; }
 .cm-tag { color: var(--accent); }
 .save-state { color: var(--muted); font-size: 12.5px; align-self: center; }
