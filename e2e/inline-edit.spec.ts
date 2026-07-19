@@ -102,6 +102,36 @@ test.describe('inline live editing', () => {
     await expect(page.getByText('No connections yet.')).toBeVisible()
   })
 
+  test('callouts render as styled boxes while editing', async ({ page, mock }) => {
+    mock.seed([
+      {
+        title: 'Callout Note',
+        slug: 'callout-note',
+        content: '# Callout Note\n\n> [!tip] Remember\n> Bigger samples are better.\n\nAfter.\n',
+      },
+    ])
+    await login(page)
+    await page.locator('.notelist').getByText('Callout Note').click()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+
+    const editor = page.locator('.md-editor .cm-content')
+    const calloutLines = editor.locator('.cm-line.cm-callout.cm-callout-tip')
+    await expect(calloutLines).toHaveCount(2) // title + body line share the box
+    await expect(editor.locator('.cm-callout-marker')).toHaveText('[!tip]')
+    await expect(editor.locator('.cm-line.cm-callout-start')).toHaveCount(1)
+    await expect(editor.locator('.cm-line.cm-callout-end')).toHaveCount(1)
+  })
+
+  test('Ctrl+clicking a wikilink in the editor follows it', async ({ page, mock }) => {
+    await login(page)
+    await page.locator('.notelist').getByText('Draft Note').click()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+
+    await page.locator('.md-editor .cm-wikilink').first().click({ modifiers: ['Control'] })
+    await expect(page).toHaveURL(/#\/note\/wiki-target$/)
+    await expect(page.getByRole('heading', { name: 'Wiki Target' })).toBeVisible()
+  })
+
   test('pending edits are flushed when navigating away quickly', async ({ page, mock }) => {
     await login(page)
     await page.locator('.notelist').getByText('Draft Note').click()

@@ -7,6 +7,7 @@ import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import { uploadImage, imageFiles, IMAGE_EXT_RE } from '../lib/images'
 import { supabase } from '../lib/supabase'
+import { slugify } from '../lib/notes'
 
 // Live syntax styling — the raw markdown stays the document (like Obsidian's
 // editor); formatting is applied visually as you type.
@@ -148,6 +149,84 @@ const imagePreview = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 )
 
+// ---- Live preview: callout blocks get their box styling while staying
+// editable — line decorations, no content replacement.
+const CALLOUT_START_RE = /^\s*>\s*\[!([A-Za-z]+)\][+-]?/
+
+function buildCalloutDecos(view: EditorView): DecorationSet {
+  const decos: Array<Range<Decoration>> = []
+  const doc = view.state.doc
+  for (const { from, to } of view.visibleRanges) {
+    let line = doc.lineAt(from)
+    let type: string | null = null
+    for (;;) {
+      const m = line.text.match(CALLOUT_START_RE)
+      if (m) {
+        type = m[1].toLowerCase()
+        decos.push(
+          Decoration.line({ class: `cm-callout cm-callout-start cm-callout-${type}` }).range(line.from),
+        )
+        const open = line.text.indexOf('[!')
+        const close = line.text.indexOf(']', open)
+        if (open >= 0 && close > open) {
+          decos.push(
+            Decoration.mark({ class: 'cm-callout-marker' }).range(line.from + open, line.from + close + 1),
+          )
+        }
+      } else if (type && /^\s*>/.test(line.text)) {
+        decos.push(Decoration.line({ class: `cm-callout cm-callout-${type}` }).range(line.from))
+      } else if (type) {
+        // Block ended on the previous line: round its bottom corner.
+        const prev = doc.lineAt(Math.max(0, line.from - 1))
+        decos.push(Decoration.line({ class: 'cm-callout-end' }).range(prev.from))
+        type = null
+      }
+      if (line.to >= to) {
+        if (type) decos.push(Decoration.line({ class: 'cm-callout-end' }).range(line.from))
+        break
+      }
+      line = doc.lineAt(line.to + 1)
+    }
+  }
+  return Decoration.set(decos, true)
+}
+
+const calloutPreview = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = buildCalloutDecos(view)
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.viewportChanged) this.decorations = buildCalloutDecos(u.view)
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
+
+// Ctrl/Cmd+click on a [[wikilink]] follows it, like Obsidian.
+function followWikilink(e: MouseEvent, view: EditorView): boolean {
+  if (!(e.ctrlKey || e.metaKey)) return false
+  const el = (e.target as HTMLElement).closest?.('.cm-wikilink')
+  if (!el) return false
+  const pos = view.posAtDOM(el, 0)
+  const line = view.state.doc.lineAt(pos)
+  const re = /!?\[\[([^\]\n|]+)(?:\|[^\]\n]*)?\]\]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line.text)) !== null) {
+    const start = line.from + m.index
+    const end = start + m[0].length
+    if (pos >= start && pos <= end) {
+      const target = m[1].trim()
+      if (IMAGE_EXT_RE.test(target)) return false
+      e.preventDefault()
+      window.location.hash = `#/note/${slugify(target)}`
+      return true
+    }
+  }
+  return false
+}
+
 const theme = EditorView.theme(
   {
     '&': { fontSize: '15.5px', backgroundColor: 'transparent' },
@@ -209,12 +288,14 @@ export function MarkdownEditor({
           syntaxHighlighting(headingStyles),
           obsidianSyntax,
           imagePreview,
+          calloutPreview,
           theme,
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onChangeRef.current(u.state.doc.toString())
           }),
           EditorView.domEventHandlers({
+            mousedown: followWikilink,
             paste: (e, view) =>
               e.clipboardData?.files.length
                 ? (e.preventDefault(), handleImages(view, imageFiles(e.clipboardData.files)))
