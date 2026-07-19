@@ -447,8 +447,61 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .backlinks h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .backlinks ul { margin: 0; padding-left: 1.2em; }
 
+/* Mobile navigation (hidden on desktop) */
+.mobile-topbar { display: none; }
+.scrim { display: none; }
+
 @media (max-width: 720px) {
-  .app { grid-template-columns: 1fr; }
-  .sidebar { position: fixed; z-index: 10; width: 84%; height: 100%; box-shadow: 0 0 40px rgba(0,0,0,0.5); transform: translateX(-100%); transition: transform 0.2s; }
-  .page { padding: 24px 18px 80px; }
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 9;
+  }
+  .mobile-topbar a { color: var(--text); font-weight: 700; font-size: 17px; }
+  .mobile-topbar a:hover { text-decoration: none; }
+  .hamburger {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 18px;
+    padding: 4px 12px;
+    cursor: pointer;
+  }
+  .sidebar {
+    position: fixed;
+    z-index: 11;
+    width: 84%;
+    max-width: 340px;
+    height: 100%;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    transform: translateX(-100%);
+    transition: transform 0.2s;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .page { padding: 20px 16px 80px; }
+  .page-head { flex-wrap: wrap; }
+  .page-head h1 { font-size: 22px; }
+  .head-actions { flex-wrap: wrap; }
+  .title-input::placeholder { font-size: 13px; }
+  .note-rail { display: none; }
+  .pager-link { max-width: 100%; }
+  .graph-reports { grid-template-columns: 1fr; }
 }
+
+/* Wide tables scroll inside the note instead of stretching the page. */
+.markdown table { display: block; overflow-x: auto; }

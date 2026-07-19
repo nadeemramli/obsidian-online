@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { compareTitles, type Note } from '../lib/notes'
 import { parseFrontmatter } from '../lib/frontmatter'
@@ -109,7 +109,14 @@ function LayoutInner() {
   const { notes } = useNotes()
   const { q, setQ } = useSearch()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Navigating anywhere closes the mobile drawer.
+  useEffect(() => {
+    setDrawerOpen(false)
+  }, [location])
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -140,7 +147,18 @@ function LayoutInner() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <header className="mobile-topbar">
+        <button
+          className="hamburger"
+          aria-label="Open navigation"
+          onClick={() => setDrawerOpen((o) => !o)}
+        >
+          ☰
+        </button>
+        <Link to="/">📓 Vault</Link>
+      </header>
+      {drawerOpen && <div className="scrim" onClick={() => setDrawerOpen(false)} />}
+      <aside className={'sidebar' + (drawerOpen ? ' open' : '')}>
         <div className="brand">
           <Link to="/">📓 Vault</Link>
         </div>

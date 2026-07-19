@@ -21,7 +21,8 @@ export async function login(page: Page) {
   await page.getByPlaceholder('Email').fill(TEST_EMAIL)
   await page.getByPlaceholder('Password').fill(TEST_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('link', { name: '+ New note' })).toBeVisible()
+  // Works on desktop and mobile (where the sidebar starts off-canvas).
+  await expect(page.getByRole('heading', { name: 'All notes' })).toBeVisible()
 }
 
 export async function createNoteViaUI(page: Page, title: string, content: string) {
