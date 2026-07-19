@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
@@ -18,7 +18,11 @@ function loadMermaid() {
         startOnLoad: false,
         theme: 'dark',
         securityLevel: 'strict',
-        themeVariables: { fontFamily: 'inherit' },
+        // Explicit font: mermaid measures node text with this exact face, so
+        // rendering must not inherit the (wider) reading serif or labels clip.
+        themeVariables: {
+          fontFamily: "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        },
       })
       return m.default
     })
@@ -28,9 +32,89 @@ function loadMermaid() {
 
 let mermaidSeq = 0
 
+// Fullscreen diagram viewer: wheel-zoom toward the cursor, drag to pan,
+// buttons for the rest. Esc or ✕ closes.
+function DiagramLightbox({ svg, onClose }: { svg: string; onClose: () => void }) {
+  const [t, setT] = useState({ x: 0, y: 0, k: 1 })
+  const viewRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number } | null>(null)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  useEffect(() => {
+    const el = viewRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      setT((prev) => {
+        const k = Math.min(8, Math.max(0.3, prev.k * Math.exp(-e.deltaY * 0.0015)))
+        const rect = el.getBoundingClientRect()
+        const px = e.clientX - rect.left - rect.width / 2
+        const py = e.clientY - rect.top - rect.height / 2
+        const cx = (px - prev.x) / prev.k
+        const cy = (py - prev.y) / prev.k
+        return { k, x: px - cx * k, y: py - cy * k }
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  const zoomBy = (f: number) =>
+    setT((prev) => ({ ...prev, k: Math.min(8, Math.max(0.3, prev.k * f)) }))
+
+  return (
+    <div
+      ref={viewRef}
+      className="mermaid-lightbox"
+      role="dialog"
+      aria-label="Diagram viewer"
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('.lightbox-controls')) return
+        dragRef.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: t.x, oy: t.y }
+        viewRef.current?.setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current
+        if (!d || d.id !== e.pointerId) return
+        setT((prev) => ({ ...prev, x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy }))
+      }}
+      onPointerUp={() => (dragRef.current = null)}
+      onPointerCancel={() => (dragRef.current = null)}
+    >
+      <div
+        className="lightbox-canvas"
+        style={{ transform: `translate(${t.x}px, ${t.y}px) scale(${t.k})` }}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <div className="lightbox-controls">
+        <button className="btn" aria-label="Zoom in" onClick={() => zoomBy(1.4)}>
+          +
+        </button>
+        <button className="btn" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)}>
+          −
+        </button>
+        <button className="btn" aria-label="Reset zoom" onClick={() => setT({ x: 0, y: 0, k: 1 })}>
+          ⌖
+        </button>
+        <button className="btn" aria-label="Close viewer" onClick={onClose}>
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function MermaidDiagram({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     let active = true
     setSvg(null)
@@ -60,7 +144,17 @@ function MermaidDiagram({ code }: { code: string }) {
     )
   }
   if (!svg) return <div className="mermaid-block muted">Rendering diagram…</div>
-  return <div className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />
+  return (
+    <>
+      <div
+        className="mermaid-block clickable"
+        title="Click to zoom"
+        onClick={() => setOpen(true)}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      {open && <DiagramLightbox svg={svg} onClose={() => setOpen(false)} />}
+    </>
+  )
 }
 
 // A #tag chip: clicking filters the sidebar to that tag.

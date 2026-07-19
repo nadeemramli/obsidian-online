@@ -45,6 +45,33 @@ test.describe('mermaid diagrams', () => {
     await expect(page.getByText('No connections yet.')).toBeVisible()
   })
 
+  test('clicking a diagram opens a zoomable, pannable lightbox', async ({ page, mock }) => {
+    await login(page)
+    await page.locator('.notelist').getByText('Process').click()
+    await expect(page.locator('.mermaid-block svg')).toBeVisible({ timeout: 15_000 })
+
+    await page.locator('.mermaid-block.clickable').click()
+    const lightbox = page.locator('.mermaid-lightbox')
+    await expect(lightbox).toBeVisible()
+    await expect(lightbox.locator('svg')).toBeVisible()
+
+    const canvas = page.locator('.lightbox-canvas')
+    const before = await canvas.getAttribute('style')
+    await page.getByRole('button', { name: 'Zoom in' }).click()
+    expect(await canvas.getAttribute('style')).not.toBe(before)
+
+    // Drag pans the diagram.
+    const box = (await lightbox.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 60, { steps: 4 })
+    await page.mouse.up()
+    expect(await canvas.getAttribute('style')).toContain('translate(120px, 60px)')
+
+    await page.keyboard.press('Escape')
+    await expect(lightbox).not.toBeVisible()
+  })
+
   test('invalid diagrams show an error with the source instead of breaking', async ({
     page,
     mock,
