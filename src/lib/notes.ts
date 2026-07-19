@@ -72,16 +72,22 @@ export async function deleteNote(id: string): Promise<void> {
   if (error) throw error
 }
 
-// Extract [[wikilink]] targets (ignoring any |alias part) from markdown.
+// Extract [[wikilink]] targets from markdown, ignoring any |alias part and
+// any #heading / #^block suffix ([[Note#Section]] links to Note).
 export function extractWikilinks(content: string): string[] {
   const re = /\[\[([^\]]+)\]\]/g
   const out: string[] = []
   let m: RegExpExecArray | null
   while ((m = re.exec(content)) !== null) {
-    const target = m[1].split('|')[0].trim()
+    const target = m[1].split('|')[0].split('#')[0].trim()
     if (target) out.push(target)
   }
   return out
+}
+
+// Natural A→Z: numeric-aware so "02 — …" sorts before "10 — …".
+export function compareTitles(a: Note, b: Note): number {
+  return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
 }
 
 // Notes that link TO the given note (by title or slug match).

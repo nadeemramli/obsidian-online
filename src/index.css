@@ -200,11 +200,37 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
   display: inline-block;
   background: rgba(167, 139, 250, 0.14);
   color: var(--accent);
+  border: none;
   border-radius: 999px;
   padding: 1px 9px;
   font-size: 0.85em;
+  font-family: inherit;
   margin: 0 1px;
+  cursor: pointer;
 }
+.tag:hover { background: rgba(167, 139, 250, 0.28); }
+
+/* Prev/next chapter navigation */
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 36px; }
+.pager-link {
+  display: inline-block;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: var(--text);
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pager-link:hover { border-color: var(--accent); text-decoration: none; }
+
+/* Graph health reports */
+.graph-reports { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+.graph-reports ul { margin: 0; padding-left: 1.2em; font-size: 13.5px; }
+.graph-reports li { margin: 3px 0; }
+@media (max-width: 800px) { .graph-reports { grid-template-columns: 1fr; } }
 
 .callout { border-left-width: 4px; padding: 10px 16px 6px; color: var(--text); }
 .callout-title { font-weight: 700; margin: 0 0 4px; }

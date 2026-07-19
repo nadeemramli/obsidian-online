@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
-import type { Note } from '../lib/notes'
+import { compareTitles, type Note } from '../lib/notes'
+import { parseFrontmatter } from '../lib/frontmatter'
+import { SearchProvider, useSearch } from '../lib/searchContext'
 import { supabase } from '../lib/supabase'
 
 type FolderNode = {
@@ -11,14 +13,18 @@ type FolderNode = {
   notes: Note[]
 }
 
-// Natural A→Z: numeric-aware so "02 — …" sorts before "10 — …".
-function byTitle(a: Note, b: Note): number {
-  return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
+function sortTree(node: FolderNode) {
+  node.notes.sort(compareTitles)
+  node.folders.forEach(sortTree)
 }
 
-function sortTree(node: FolderNode) {
-  node.notes.sort(byTitle)
-  node.folders.forEach(sortTree)
+// Does a note match a "#tag" query? Checks inline #tags in the content and
+// the frontmatter tags list.
+function matchesTag(note: Note, tag: string): boolean {
+  if (note.content.toLowerCase().includes(`#${tag}`)) return true
+  const fmTags = parseFrontmatter(note.content).data.tags
+  const list = Array.isArray(fmTags) ? fmTags : typeof fmTags === 'string' ? [fmTags] : []
+  return list.some((t) => t.replace(/^#/, '').toLowerCase() === tag)
 }
 
 function buildTree(notes: Note[]): FolderNode {
@@ -92,14 +98,26 @@ function FolderBranch({
 }
 
 export function Layout() {
+  return (
+    <SearchProvider>
+      <LayoutInner />
+    </SearchProvider>
+  )
+}
+
+function LayoutInner() {
   const { notes } = useNotes()
-  const [q, setQ] = useState('')
+  const { q, setQ } = useSearch()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const navigate = useNavigate()
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return notes
+    if (s.startsWith('#') && s.length > 1) {
+      const tag = s.slice(1)
+      return notes.filter((n) => matchesTag(n, tag))
+    }
     return notes.filter(
       (n) =>
         n.title.toLowerCase().includes(s) ||

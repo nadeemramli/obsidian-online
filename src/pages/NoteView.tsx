@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { NoteContent } from '../lib/markdown'
-import { findBacklinks, updateNote } from '../lib/notes'
+import { compareTitles, findBacklinks, updateNote } from '../lib/notes'
 import { NoteRail } from '../components/NoteRail'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 
@@ -16,6 +16,18 @@ export default function NoteView() {
   const note = notes.find((n) => n.slug === slug)
   const knownSlugs = useMemo(() => new Set(notes.map((n) => n.slug)), [notes])
   const backlinks = useMemo(() => (note ? findBacklinks(note, notes) : []), [note, notes])
+
+  // Auto-derived chapter navigation: siblings in the same folder, in natural
+  // title order (no prev/next frontmatter to maintain).
+  const { prev, next } = useMemo(() => {
+    if (!note || !note.folder) return { prev: null, next: null }
+    const siblings = notes.filter((n) => n.folder === note.folder).sort(compareTitles)
+    const i = siblings.findIndex((n) => n.id === note.id)
+    return {
+      prev: i > 0 ? siblings[i - 1] : null,
+      next: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
+    }
+  }, [note, notes])
 
   const [mode, setMode] = useState<Mode>(() =>
     localStorage.getItem(MODE_KEY) === 'edit' ? 'edit' : 'read',
@@ -129,6 +141,24 @@ export default function NoteView() {
           />
         ) : (
           <NoteContent content={note.content} knownSlugs={knownSlugs} />
+        )}
+        {(prev || next) && (
+          <nav className="pager">
+            {prev ? (
+              <Link className="pager-link" to={`/note/${prev.slug}`}>
+                ← {prev.title}
+              </Link>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <Link className="pager-link next" to={`/note/${next.slug}`}>
+                {next.title} →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
         )}
         <section className="backlinks">
           <h3>Linked from ({backlinks.length})</h3>

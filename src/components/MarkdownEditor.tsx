@@ -217,8 +217,8 @@ function followWikilink(e: MouseEvent, view: EditorView): boolean {
     const start = line.from + m.index
     const end = start + m[0].length
     if (pos >= start && pos <= end) {
-      const target = m[1].trim()
-      if (IMAGE_EXT_RE.test(target)) return false
+      const target = m[1].split('#')[0].trim()
+      if (!target || IMAGE_EXT_RE.test(m[1].trim())) return false
       e.preventDefault()
       window.location.hash = `#/note/${slugify(target)}`
       return true

@@ -117,6 +117,24 @@ test.describe('graph view', () => {
     await expect(page.locator('g.graph-node[data-slug="alpha"]')).not.toHaveClass(/dim/)
   })
 
+  test('reports unresolved links and orphans below the graph', async ({ page, mock }) => {
+    mock.seed([
+      { title: 'Ghost Src', slug: 'ghost-src', content: 'See [[Ghost Note]].', folder: 'Statistics' },
+    ])
+    await login(page)
+    await page.getByRole('link', { name: 'Graph' }).click()
+
+    const reports = page.locator('.graph-reports')
+    await expect(reports.getByText('Unresolved links (1)')).toBeVisible()
+    await expect(reports.locator('a.wikilink.missing', { hasText: 'Ghost Note' })).toBeVisible()
+    await expect(reports.getByText(/from Ghost Src/)).toBeVisible()
+
+    // Island never links anywhere; Ghost Src's only link is unresolved.
+    await expect(reports.getByText('Orphans (2)')).toBeVisible()
+    await expect(reports.getByRole('link', { name: 'Island' })).toBeVisible()
+    await expect(reports.getByRole('link', { name: 'Ghost Src' })).toBeVisible()
+  })
+
   test('shows an empty state without notes', async ({ page, mock }) => {
     mock.notes = []
     await login(page)

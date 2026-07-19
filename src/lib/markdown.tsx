@@ -5,7 +5,18 @@ import { visit } from 'unist-util-visit'
 import { slugify } from './notes'
 import { useNotes } from './notesContext'
 import { parseFrontmatter, stripFrontmatter, type Frontmatter } from './frontmatter'
+import { useSearch } from './searchContext'
 import { supabase } from './supabase'
+
+// A #tag chip: clicking filters the sidebar to that tag.
+function TagChip({ name }: { name: string }) {
+  const { setQ } = useSearch()
+  return (
+    <button className="tag" onClick={() => setQ(`#${name.replace(/^#/, '')}`)}>
+      #{name.replace(/^#/, '')}
+    </button>
+  )
+}
 
 // remark plugin: Obsidian inline syntax inside text nodes —
 //   ![[Note]]        note embed
@@ -44,18 +55,24 @@ function remarkObsidianInline() {
           } else {
             children.push({
               type: 'link',
-              url: `#/embed/${slugify(target)}`,
+              url: `#/embed/${slugify(target.split('#')[0].trim())}`,
               children: [{ type: 'text', value: target }],
             })
           }
         } else if (wiki !== undefined) {
           const [rawTarget, alias] = wiki.split('|')
           const target = rawTarget.trim()
-          children.push({
-            type: 'link',
-            url: `#/note/${slugify(target)}`,
-            children: [{ type: 'text', value: (alias ?? rawTarget).trim() }],
-          })
+          // [[Note#Heading]] resolves to Note; the label keeps what was typed.
+          const noteTarget = target.split('#')[0].trim()
+          if (!noteTarget) {
+            children.push({ type: 'text', value: m[0] })
+          } else {
+            children.push({
+              type: 'link',
+              url: `#/note/${slugify(noteTarget)}`,
+              children: [{ type: 'text', value: (alias ?? rawTarget).trim() }],
+            })
+          }
         } else if (highlight !== undefined) {
           children.push({
             type: 'strong',
@@ -65,8 +82,8 @@ function remarkObsidianInline() {
         } else if (tag !== undefined) {
           if (tagSpace) children.push({ type: 'text', value: tagSpace })
           children.push({
-            type: 'strong',
-            data: { hName: 'span', hProperties: { className: ['tag'] } },
+            type: 'link',
+            url: `#tag:${tag}`,
             children: [{ type: 'text', value: `#${tag}` }],
           })
         }
@@ -196,6 +213,9 @@ export function Markdown({
         h5: heading('h5'),
         h6: heading('h6'),
         a({ node, href, children, ...rest }: any) {
+          if (typeof href === 'string' && href.startsWith('#tag:')) {
+            return <TagChip name={href.slice(5)} />
+          }
           if (typeof href === 'string' && href.startsWith('#/embed/')) {
             return <NoteEmbed slug={href.replace('#/embed/', '')} depth={depth} />
           }
@@ -233,9 +253,7 @@ function PropertyValue({ name, value }: { name: string; value: string | string[]
     return (
       <>
         {values.map((v) => (
-          <span key={v} className="tag">
-            #{v.replace(/^#/, '')}
-          </span>
+          <TagChip key={v} name={v} />
         ))}
       </>
     )

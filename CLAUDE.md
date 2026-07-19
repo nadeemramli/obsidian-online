@@ -21,3 +21,7 @@
 - `supabase/functions/vault-mcp/` is an MCP server (Edge Function) for Claude access;
   auth = anon-key JWT + `x-vault-token` checked against RLS-locked `public.mcp_tokens`.
   Redeploy via the Supabase MCP `deploy_edge_function` tool after editing.
+- Math: formulas stay Unicode plain text. If typeset math is ever added, use
+  remark-math + rehype-katex with `$$…$$` / `\(…\)` ONLY — never enable
+  single-`$` inline math: the vault's finance notes are dense with currency `$`
+  and a single-dollar parser would mangle them.

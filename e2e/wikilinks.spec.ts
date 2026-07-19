@@ -55,6 +55,20 @@ test.describe('wikilinks and backlinks', () => {
     ).not.toHaveClass(/missing/)
   })
 
+  test('resolves [[Note#Heading]] links to the note', async ({ page, mock }) => {
+    mock.seed([
+      { title: 'Header Link', slug: 'header-link', content: 'See [[Backpropagation#Chain rule]].' },
+    ])
+    await login(page)
+    await page.locator('.notelist').getByText('Header Link').click()
+
+    const link = page.locator('article.markdown a.wikilink', { hasText: 'Backpropagation#Chain rule' })
+    await expect(link).not.toHaveClass(/missing/)
+    await link.click()
+    await expect(page).toHaveURL(/#\/note\/backpropagation$/)
+    await expect(page.getByRole('heading', { name: 'Backpropagation' })).toBeVisible()
+  })
+
   test('lists backlinks on the target note', async ({ page, mock }) => {
     await login(page)
     await page.locator('.notelist').getByText('Backpropagation').click()

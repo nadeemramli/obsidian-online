@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { buildGraphData, Simulation } from '../lib/graphLayout'
+import { extractWikilinks, slugify } from '../lib/notes'
 
 const W = 900
 const H = 620
@@ -215,6 +217,25 @@ export default function Graph() {
     return map
   }, [graph])
 
+  // Vault health: red links (targets that don't exist) and orphans (notes
+  // with no resolved links in either direction).
+  const { unresolved, orphans } = useMemo(() => {
+    const bySlug = new Set(notes.map((n) => n.slug))
+    const missing = new Map<string, { text: string; sources: Set<string> }>()
+    for (const n of notes) {
+      for (const link of extractWikilinks(n.content)) {
+        const slug = slugify(link)
+        if (bySlug.has(slug)) continue
+        if (!missing.has(slug)) missing.set(slug, { text: link, sources: new Set() })
+        missing.get(slug)!.sources.add(n.title)
+      }
+    }
+    return {
+      unresolved: Array.from(missing.entries()).sort((a, b) => a[1].text.localeCompare(b[1].text)),
+      orphans: graph.nodes.filter((nd) => nd.degree === 0).map((nd) => nd.note),
+    }
+  }, [notes, graph])
+
   const q = query.trim().toLowerCase()
   const matches = useMemo(() => {
     if (!q) return null
@@ -320,6 +341,40 @@ export default function Graph() {
             Drag the background to pan · scroll to zoom · drag nodes to rearrange · click a node to
             open the note
           </p>
+          <div className="graph-reports">
+            <section className="rail-section">
+              <h4>Unresolved links ({unresolved.length})</h4>
+              {unresolved.length === 0 ? (
+                <p className="muted rail-empty">Every wikilink points at a real note.</p>
+              ) : (
+                <ul>
+                  {unresolved.map(([slug, u]) => (
+                    <li key={slug}>
+                      <a className="wikilink missing" href={`#/note/${slug}`}>
+                        {u.text}
+                      </a>{' '}
+                      <span className="muted">from {Array.from(u.sources).join(', ')}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="rail-section">
+              <h4>Orphans ({orphans.length})</h4>
+              {orphans.length === 0 ? (
+                <p className="muted rail-empty">Every note is connected.</p>
+              ) : (
+                <ul>
+                  {orphans.map((n) => (
+                    <li key={n.id}>
+                      <Link to={`/note/${n.slug}`}>{n.title}</Link>
+                      {n.folder && <span className="muted"> · 📁 {n.folder}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
         </>
       )}
     </div>

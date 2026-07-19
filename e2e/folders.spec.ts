@@ -93,6 +93,28 @@ test.describe('folder system', () => {
     await expect(page.locator('.notelist').getByRole('button', { name: /Archive/ })).toBeVisible()
   })
 
+  test('chapter notes get prev/next navigation within their folder', async ({ page, mock }) => {
+    mock.seed([
+      { title: '01 — Intro', slug: 'ch-01', content: 'one', folder: 'FBT' },
+      { title: '02 — Environment', slug: 'ch-02', content: 'two', folder: 'FBT' },
+      { title: '03 — Organisations', slug: 'ch-03', content: 'three', folder: 'FBT' },
+    ])
+    await login(page)
+    await page.locator('.notelist').getByText('02 — Environment').click()
+
+    const pager = page.locator('nav.pager')
+    await expect(pager.getByText('← 01 — Intro')).toBeVisible()
+    await expect(pager.getByText('03 — Organisations →')).toBeVisible()
+    await pager.getByText('03 — Organisations →').click()
+    await expect(page).toHaveURL(/#\/note\/ch-03$/)
+    // Last chapter: next is empty, prev points back.
+    await expect(page.locator('nav.pager').getByText('← 02 — Environment')).toBeVisible()
+
+    // Root notes (no folder) get no pager.
+    await page.locator('.notelist').getByText('Inbox Note').click()
+    await expect(page.locator('nav.pager')).not.toBeVisible()
+  })
+
   test('search flattens the tree and shows folder context', async ({ page, mock }) => {
     await login(page)
     await page.getByPlaceholder('Search notes…').fill('stats')

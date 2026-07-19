@@ -62,7 +62,28 @@ test.describe('Obsidian formatting', () => {
   test('renders #tags as chips', async ({ page, mock }) => {
     await login(page)
     await page.locator('.notelist').getByText('Sampling').click()
-    await expect(page.locator('article.markdown span.tag')).toHaveText('#probability')
+    await expect(page.locator('article.markdown button.tag')).toHaveText('#probability')
+  })
+
+  test('clicking a tag chip filters the sidebar to that tag', async ({ page, mock }) => {
+    await login(page)
+    await page.locator('.notelist').getByText('Sampling').click()
+    await page.locator('article.markdown button.tag', { hasText: '#probability' }).click()
+
+    await expect(page.getByPlaceholder('Search notes…')).toHaveValue('#probability')
+    const list = page.locator('.notelist')
+    await expect(list.getByText('Sampling')).toBeVisible()
+    await expect(list.getByText('Distributions')).not.toBeVisible()
+    await expect(list.getByText('Reading List')).not.toBeVisible()
+  })
+
+  test('searching #tag matches frontmatter tags too', async ({ page, mock }) => {
+    await login(page)
+    // "statistics" appears only in Sampling's frontmatter tags, not its body.
+    await page.getByPlaceholder('Search notes…').fill('#statistics')
+    const list = page.locator('.notelist')
+    await expect(list.getByText('Sampling')).toBeVisible()
+    await expect(list.getByText('Distributions')).not.toBeVisible()
   })
 
   test('embeds other notes with ![[...]]', async ({ page, mock }) => {
