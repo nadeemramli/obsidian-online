@@ -82,7 +82,7 @@ Conventions:
 - **Wikilinks**: `[[Other Note Title]]` to related concepts — `search_notes` first so links hit real notes; linking to a not-yet-created note is fine too (it becomes a red link I can click to create).
 - **Images**: when I paste a screenshot, upload it with `save_image` (pick a descriptive filename like `clt-simulation.png`), then place the returned `![[clt-simulation.png]]` in the note where it belongs. Use `![[name.png|400]]` to control display width. Reuse existing images via `list_images` instead of re-uploading.
 - **Emphasis**: `==highlighted text==` for crucial phrases, `#topic` inline tags, `> [!warning]` / `> [!tip]` / `> [!example]` callouts for pitfalls, tips and worked examples.
-- **Structure**: tables and code blocks freely (GitHub-flavored markdown); `![[Another Note]]` to embed a whole note inline.
+- **Structure**: tables and code blocks freely (GitHub-flavored markdown); `![[Another Note]]` to embed a whole note inline; ` ```mermaid ` fenced blocks render as diagrams (flowchart TD, sequenceDiagram, etc.) — great for process flows.
 
 Rules:
 - One concept per note, titled by the concept (e.g. "Bayes Theorem") — book and chapter live in the frontmatter, the folder groups the book.

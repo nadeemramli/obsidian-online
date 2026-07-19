@@ -8,6 +8,61 @@ import { parseFrontmatter, stripFrontmatter, type Frontmatter } from './frontmat
 import { useSearch } from './searchContext'
 import { supabase } from './supabase'
 
+// ---- Mermaid diagrams (```mermaid fences), lazy-loaded so the heavy
+// library is only fetched when a note actually contains a diagram.
+let mermaidPromise: Promise<typeof import('mermaid')['default']> | null = null
+function loadMermaid() {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((m) => {
+      m.default.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'strict',
+        themeVariables: { fontFamily: 'inherit' },
+      })
+      return m.default
+    })
+  }
+  return mermaidPromise
+}
+
+let mermaidSeq = 0
+
+function MermaidDiagram({ code }: { code: string }) {
+  const [svg, setSvg] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    setSvg(null)
+    setError(null)
+    const id = `mmd-${++mermaidSeq}`
+    loadMermaid()
+      .then((m) => m.render(id, code))
+      .then(({ svg }) => {
+        if (active) setSvg(svg)
+      })
+      .catch((e: any) => {
+        // Mermaid can leave a dangling error element behind on parse failure.
+        document.getElementById(`d${id}`)?.remove()
+        if (active) setError(e?.message || 'Invalid diagram')
+      })
+    return () => {
+      active = false
+    }
+  }, [code])
+
+  if (error) {
+    return (
+      <div className="mermaid-block error">
+        <div className="mermaid-error-title">Mermaid syntax error</div>
+        <pre>{code}</pre>
+      </div>
+    )
+  }
+  if (!svg) return <div className="mermaid-block muted">Rendering diagram…</div>
+  return <div className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />
+}
+
 // A #tag chip: clicking filters the sidebar to that tag.
 function TagChip({ name }: { name: string }) {
   const { setQ } = useSearch()
@@ -233,6 +288,19 @@ export function Markdown({
               {children}
             </a>
           )
+        },
+        pre({ node, children, ...rest }: any) {
+          // ```mermaid fences render as diagrams instead of code blocks.
+          const codeEl = node?.children?.[0]
+          const classes: string[] = codeEl?.properties?.className ?? []
+          if (codeEl?.tagName === 'code' && classes.includes('language-mermaid')) {
+            const text = (codeEl.children ?? [])
+              .map((c: any) => c.value ?? '')
+              .join('')
+              .trim()
+            return <MermaidDiagram code={text} />
+          }
+          return <pre {...rest}>{children}</pre>
         },
         img({ node, src, alt, ...rest }: any) {
           if (typeof src === 'string' && src.startsWith('storage:')) {

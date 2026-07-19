@@ -153,8 +153,8 @@ export function Editor({
       <p className="hint">
         Obsidian syntax supported: <code>[[wikilinks]]</code>, <code>![[embeds]]</code>,{' '}
         <code>![[image.png]]</code>, <code>==highlights==</code>, <code>#tags</code>,{' '}
-        <code>&gt; [!note]</code> callouts, and YAML frontmatter. Drag &amp; drop or paste images
-        straight into the editor.
+        <code>&gt; [!note]</code> callouts, YAML frontmatter, and <code>```mermaid</code> diagrams.
+        Drag &amp; drop or paste images straight into the editor.
       </p>
       {err && <div className="msg error">{err}</div>}
       {preview ? (

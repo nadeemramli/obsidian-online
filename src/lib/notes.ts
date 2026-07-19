@@ -73,12 +73,15 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 // Extract [[wikilink]] targets from markdown, ignoring any |alias part and
-// any #heading / #^block suffix ([[Note#Section]] links to Note).
+// any #heading / #^block suffix ([[Note#Section]] links to Note). Code is
+// not prose: fenced blocks and inline code are skipped (mermaid's
+// A[[subroutine]] shape syntax would otherwise read as a wikilink).
 export function extractWikilinks(content: string): string[] {
+  const prose = content.replace(/```[\s\S]*?(```|$)/g, '').replace(/`[^`\n]*`/g, '')
   const re = /\[\[([^\]]+)\]\]/g
   const out: string[] = []
   let m: RegExpExecArray | null
-  while ((m = re.exec(content)) !== null) {
+  while ((m = re.exec(prose)) !== null) {
     const target = m[1].split('|')[0].split('#')[0].trim()
     if (target) out.push(target)
   }
