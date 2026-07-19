@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
 import { compareTitles, type Note } from '../lib/notes'
@@ -110,12 +110,16 @@ function LayoutInner() {
   const { q, setQ } = useSearch()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const contentRef = useRef<HTMLElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Navigating anywhere closes the mobile drawer.
+  // Navigating anywhere closes the mobile drawer and starts the new page at
+  // the top (the scroll container otherwise keeps its position, so "next
+  // chapter" would open at the bottom).
   useEffect(() => {
     setDrawerOpen(false)
+    contentRef.current?.scrollTo(0, 0)
   }, [location])
 
   const filtered = useMemo(() => {
@@ -203,7 +207,7 @@ function LayoutInner() {
           </button>
         </div>
       </aside>
-      <main className="content">
+      <main className="content" ref={contentRef}>
         <Outlet />
       </main>
     </div>

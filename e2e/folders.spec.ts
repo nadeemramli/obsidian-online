@@ -96,7 +96,7 @@ test.describe('folder system', () => {
   test('chapter notes get prev/next navigation within their folder', async ({ page, mock }) => {
     mock.seed([
       { title: '01 — Intro', slug: 'ch-01', content: 'one', folder: 'FBT' },
-      { title: '02 — Environment', slug: 'ch-02', content: 'two', folder: 'FBT' },
+      { title: '02 — Environment', slug: 'ch-02', content: 'two\n\n' + 'Long paragraph.\n\n'.repeat(60), folder: 'FBT' },
       { title: '03 — Organisations', slug: 'ch-03', content: 'three', folder: 'FBT' },
     ])
     await login(page)
@@ -105,8 +105,14 @@ test.describe('folder system', () => {
     const pager = page.locator('nav.pager')
     await expect(pager.getByText('← 01 — Intro')).toBeVisible()
     await expect(pager.getByText('03 — Organisations →')).toBeVisible()
+    // Reading position: scroll to the pager at the bottom, then go next —
+    // the new chapter must start at the top.
+    await pager.scrollIntoViewIfNeeded()
     await pager.getByText('03 — Organisations →').click()
     await expect(page).toHaveURL(/#\/note\/ch-03$/)
+    await expect
+      .poll(() => page.locator('main.content').evaluate((el) => el.scrollTop))
+      .toBe(0)
     // Last chapter: next is empty, prev points back.
     await expect(page.locator('nav.pager').getByText('← 02 — Environment')).toBeVisible()
 
