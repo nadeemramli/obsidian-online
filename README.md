@@ -16,6 +16,9 @@ and attach screenshots. Built as a client-side SPA on Supabase + Vercel.
 - **Backlinks**: every note lists what links to it
 - **Claude integration**: `vault-mcp` Supabase Edge Function exposes the vault as an MCP server
   (see `docs/COWORK.md`)
+- **ACCA practice**: interactive activities (first type: the double-entry matrix), server-side
+  scoring, attempt history, an error log of misconceptions, and a role-gated quiz builder for
+  editors — see `docs/PRD.md`
 - **Search** across titles and content
 - **Full editor**: create / edit / delete, Write/Preview toggle, screenshot upload
 - **Private**: Supabase Auth + Row Level Security; nothing is visible without logging in
@@ -53,7 +56,11 @@ Supabase project, update `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
 ## Database
 - Table `public.notes` (id, title, slug, content, timestamps) with an `updated_at` trigger
-- RLS: authenticated users have full access; anonymous blocked
+- RLS: authenticated users have full access to notes; anonymous blocked
+- Learning system: `profiles` (roles: learner / content_editor / admin), `learning_items` +
+  `learning_item_answers` (answer keys readable by editors only), `quizzes`/`quiz_items`,
+  and per-user `practice_sessions`, `attempts`, `error_log`, `review_states` (ownership RLS).
+  Evaluation runs in the `practice-submit` Edge Function so answer keys never reach learners.
 - Storage bucket `screenshots` (private; signed URLs at render time)
 - Helper `public.add_note(title, content)` inserts a note with an auto-generated unique slug
 

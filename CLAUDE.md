@@ -21,6 +21,17 @@
 - `supabase/functions/vault-mcp/` is an MCP server (Edge Function) for Claude access;
   auth = anon-key JWT + `x-vault-token` checked against RLS-locked `public.mcp_tokens`.
   Redeploy via the Supabase MCP `deploy_edge_function` tool after editing.
+- ACCA learning system (PRD: `docs/PRD.md`): content tables (`learning_items`,
+  `learning_item_answers`, `quizzes`, `quiz_items`) are editor-owned; learner state
+  (`profiles`, `practice_sessions`, `attempts`, `error_log`, `review_states`) is
+  RLS-owned per user. Answer keys are never readable by learners — evaluation happens
+  in the `practice-submit` Edge Function (service role reads the key only; all writes
+  go through the caller's RLS-scoped client).
+- `supabase/functions/practice-submit/scoring.ts` and `validate.ts` are byte-for-byte
+  copies of `src/lib/practice/*.ts`. Edit the src versions, re-copy, redeploy —
+  `e2e/practice-scoring.spec.ts` fails if they drift.
+- After any migration, regenerate `src/lib/database.types.ts` with the Supabase MCP
+  `generate_typescript_types` tool, and run the security advisors.
 - Math: formulas stay Unicode plain text. If typeset math is ever added, use
   remark-math + rehype-katex with `$$…$$` / `\(…\)` ONLY — never enable
   single-`$` inline math: the vault's finance notes are dense with currency `$`

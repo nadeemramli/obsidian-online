@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
+type Mode = 'login' | 'signup' | 'forgot'
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<Mode>('login')
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
@@ -25,10 +27,17 @@ export default function Login() {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         navigate('/', { replace: true })
-      } else {
+      } else if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
         setMsg('Account created. If email confirmation is on, confirm via email, then sign in.')
+        setMode('login')
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}${window.location.pathname}`,
+        })
+        if (error) throw error
+        setMsg('If that address has an account, a reset link is on its way.')
         setMode('login')
       }
     } catch (err: any) {
@@ -43,7 +52,11 @@ export default function Login() {
       <form onSubmit={submit} className="card">
         <h1>📓 Vault</h1>
         <p className="muted">
-          {mode === 'login' ? 'Sign in to your notes' : 'Create an account'}
+          {mode === 'login'
+            ? 'Sign in to your notes'
+            : mode === 'signup'
+              ? 'Create an account'
+              : 'Reset your password'}
         </p>
         <input
           placeholder="Email"
@@ -52,15 +65,23 @@ export default function Login() {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        {mode !== 'forgot' && (
+          <input
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        )}
         <button disabled={busy} type="submit" className="btn primary block">
-          {busy ? '…' : mode === 'login' ? 'Sign in' : 'Sign up'}
+          {busy
+            ? '…'
+            : mode === 'login'
+              ? 'Sign in'
+              : mode === 'signup'
+                ? 'Sign up'
+                : 'Send reset link'}
         </button>
         {msg && <div className="msg">{msg}</div>}
         <button
@@ -70,6 +91,11 @@ export default function Login() {
         >
           {mode === 'login' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
         </button>
+        {mode === 'login' && (
+          <button type="button" className="link" onClick={() => setMode('forgot')}>
+            Forgot password?
+          </button>
+        )}
       </form>
     </div>
   )

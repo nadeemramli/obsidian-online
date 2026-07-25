@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useNotes } from '../lib/notesContext'
+import { useProfile } from '../lib/profile'
 import { compareTitles, type Note } from '../lib/notes'
 import { parseFrontmatter } from '../lib/frontmatter'
 import { SearchProvider, useSearch } from '../lib/searchContext'
@@ -107,6 +108,7 @@ export function Layout() {
 
 function LayoutInner() {
   const { notes } = useNotes()
+  const { isEditor } = useProfile()
   const { q, setQ } = useSearch()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -173,6 +175,14 @@ function LayoutInner() {
           <Link className="btn block" to="/graph">
             🕸 Graph
           </Link>
+          <Link className="btn block" to="/practice">
+            🎓 Practice
+          </Link>
+          {isEditor && (
+            <Link className="btn block" to="/builder">
+              🛠 Builder
+            </Link>
+          )}
         </div>
         <input
           className="search"
