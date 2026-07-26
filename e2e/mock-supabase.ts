@@ -18,6 +18,7 @@ import {
 } from './practice-fixture'
 import { MUGG_ITEM, MUGG_KEY, MUGG_OVERALL } from './journal-fixture'
 import { fernleafMockData } from './fernleaf-fixture'
+import { generateSoleTraderCase } from '../supabase/functions/case-generate/generator.ts'
 
 export const TEST_EMAIL = 'reader@vault.test'
 export const TEST_PASSWORD = 'test-password-123'
@@ -112,6 +113,10 @@ export class MockSupabase {
   quizItems: Array<Record<string, any>> = []
   spines: Array<Record<string, any>> = []
   spineStages: Array<Record<string, any>> = []
+  generatedCases: Array<Record<string, any>> = []
+  generatedKeys: Array<{ case_id: string; keys: any[] }> = []
+  // Fixed default seed keeps generation-dependent tests deterministic.
+  generateSeed = 12345
   private seq = 0
 
   seed(items: Array<{ title: string; slug: string; content: string; folder?: string }>) {
@@ -459,6 +464,7 @@ export class MockSupabase {
           item_id: body.item_id ?? null,
           quiz_id: body.quiz_id ?? null,
           spine_id: body.spine_id ?? null,
+          generated_case_id: body.generated_case_id ?? null,
           lane: body.lane ?? 'specific',
           status: 'in_progress',
           started_at: new Date().toISOString(),
@@ -512,6 +518,40 @@ export class MockSupabase {
       }
     }
 
+    // ---- Edge function: case-generate ----
+    if (path === '/functions/v1/case-generate' && method === 'POST') {
+      if (!(req.headers()['authorization'] || '').includes('mock-access-token')) {
+        return json(route, { error: 'Not signed in' }, 401)
+      }
+      const body = (req.postDataJSON() as any) ?? {}
+      const seed = body.seed ?? this.generateSeed
+      const generated = generateSoleTraderCase(seed)
+      this.seq += 1
+      const caseRow = {
+        id: `gencase-${this.seq}`,
+        user_id: TEST_USER_ID,
+        family: 'sole_trader',
+        template: generated.template,
+        seed,
+        title: generated.title,
+        stages: generated.stages,
+        config: generated.config,
+        created_at: new Date().toISOString(),
+      }
+      this.generatedCases.push(caseRow)
+      this.generatedKeys.push({ case_id: caseRow.id, keys: generated.keys })
+      return json(route, { case_id: caseRow.id, seed, title: caseRow.title })
+    }
+
+    // ---- PostgREST: generated_cases (owner-only; keys are never served) ----
+    if (path === '/rest/v1/generated_cases' && method === 'GET') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      const idFilter = param(url, 'id')
+      let rows = this.generatedCases.slice()
+      if (idFilter) rows = rows.filter((c) => c.id === idFilter)
+      return this.reply(route, rows, wantsObject)
+    }
+
     // ---- Edge function: practice-submit (server-side evaluation) ----
     if (path === '/functions/v1/practice-submit' && method === 'POST') {
       if (!(req.headers()['authorization'] || '').includes('mock-access-token')) {
@@ -533,36 +573,60 @@ export class MockSupabase {
           duplicate: true,
         })
       }
-      const item = this.items.find((i) => i.id === body.item_id && i.status === 'published')
-      if (!item) return json(route, { error: 'Activity not found' }, 404)
-      const key = this.answers.find((a) => a.item_id === item.id && a.version === item.version)
-      if (!key) return json(route, { error: 'This activity has no answer key yet' }, 500)
-      const kind = (item as any).kind
+
+      let kind: string
+      let config: unknown
+      let answerKey: unknown
+      let item: MockItem | null = null
+      if (body.generated_case_id) {
+        const caseRow = this.generatedCases.find((c) => c.id === body.generated_case_id)
+        if (!caseRow) return json(route, { error: 'Case not found' }, 404)
+        const stage = caseRow.stages[body.stage_index]
+        if (!stage) return json(route, { error: 'Stage not found' }, 404)
+        const keys = this.generatedKeys.find((k) => k.case_id === caseRow.id)
+        kind = stage.kind
+        config = stage.config
+        answerKey = keys?.keys[body.stage_index]
+      } else {
+        item = this.items.find((i) => i.id === body.item_id && i.status === 'published') ?? null
+        if (!item) return json(route, { error: 'Activity not found' }, 404)
+        const key = this.answers.find((a) => a.item_id === item!.id && a.version === item!.version)
+        if (!key) return json(route, { error: 'This activity has no answer key yet' }, 500)
+        kind = (item as any).kind
+        config = item.config
+        answerKey = key.answer_key
+      }
       const feedback =
         kind === 'journal_entry'
           ? scoreJournal(
-              item.config as unknown as JournalConfig,
-              key.answer_key as unknown as JournalAnswerKey,
+              config as unknown as JournalConfig,
+              answerKey as unknown as JournalAnswerKey,
               body.answers ?? {},
             )
           : kind === 'statement_prep'
             ? scoreStatement(
-                item.config as unknown as StatementConfig,
-                key.answer_key as unknown as StatementAnswerKey,
+                config as unknown as StatementConfig,
+                answerKey as unknown as StatementAnswerKey,
                 body.answers ?? {},
               )
-            : scoreMatrix(item.config as MatrixConfig, key.answer_key, body.answers ?? {})
+            : scoreMatrix(config as MatrixConfig, answerKey as MatrixAnswerKey, body.answers ?? {})
+      const overall = item
+        ? (this.answers.find((a) => a.item_id === item!.id && a.version === item!.version)
+            ?.overall_explanation_md ?? null)
+        : null
       const storedFeedback = {
         ...feedback,
-        overall_explanation_md: key.overall_explanation_md,
+        overall_explanation_md: overall,
       }
       this.seq += 1
       const attempt = {
         id: `attempt-${this.seq}`,
         session_id: body.session_id ?? null,
         user_id: TEST_USER_ID,
-        item_id: item.id,
-        item_version: item.version,
+        item_id: item ? item.id : null,
+        generated_case_id: body.generated_case_id ?? null,
+        stage_index: body.stage_index ?? null,
+        item_version: item ? item.version : 1,
         client_submission_id: body.client_submission_id,
         answers: body.answers ?? {},
         feedback: storedFeedback,
@@ -583,7 +647,8 @@ export class MockSupabase {
             id: `err-${this.seq}`,
             user_id: TEST_USER_ID,
             attempt_id: attempt.id,
-            item_id: item.id,
+            item_id: item ? item.id : null,
+            generated_case_id: body.generated_case_id ?? null,
             row_id: row.row_id,
             cell: cell.column_id,
             row_label: row.row_label,
@@ -591,8 +656,8 @@ export class MockSupabase {
               ? feedback.option_labels[cell.selected] ?? cell.selected
               : '',
             expected_label: feedback.option_labels[cell.correct] ?? cell.correct,
-            paper: item.paper,
-            topic: item.topic,
+            paper: item ? item.paper : 'FFA',
+            topic: item ? item.topic : 'Sole trader accounts preparation',
             resolved: false,
             created_at: new Date().toISOString(),
           })
@@ -606,7 +671,7 @@ export class MockSupabase {
       return json(route, {
         attempt_id: attempt.id,
         feedback: storedFeedback,
-        overall_explanation_md: key.overall_explanation_md,
+        overall_explanation_md: overall,
         cell_score: feedback.cell_score,
         cell_max: feedback.cell_max,
         tx_correct: feedback.tx_correct,

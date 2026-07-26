@@ -24,11 +24,16 @@ export function StageRun({
   sessionId,
   nextLabel,
   onDone,
+  generated,
 }: {
   item: LearningItem
   sessionId: string | null
   nextLabel: string
   onDone: (result: SubmitResult) => void
+  // When set, this stage belongs to a generated case: submissions target
+  // (generated_case_id, stage_index) instead of item_id. `item` is then a
+  // synthesized shell carrying kind/config/prompt and a stable draft id.
+  generated?: { caseId: string; stageIndex: number }
 }) {
   const { session } = useAuth()
   const userId = session?.user?.id ?? 'anon'
@@ -89,7 +94,9 @@ export function StageRun({
     setSubmitError(null)
     try {
       const res = await submitAttempt({
-        item_id: item.id,
+        ...(generated
+          ? { generated_case_id: generated.caseId, stage_index: generated.stageIndex }
+          : { item_id: item.id }),
         session_id: sessionId,
         client_submission_id: runRef.current.submissionId,
         answers: response,

@@ -1035,6 +1035,16 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
 .stage-chip.done { color: var(--ok); border-color: rgba(74, 222, 128, 0.4); }
 .stage-title { margin: 0 0 4px; font-size: 16px; }
 
+button.generate-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  border-style: dashed;
+}
+button.generate-card:hover { border-color: var(--warn); }
+button.generate-card:disabled { opacity: 0.6; cursor: default; }
+
 .skill-list { display: flex; flex-direction: column; gap: 8px; }
 .skill-row {
   display: flex;

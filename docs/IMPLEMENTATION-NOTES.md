@@ -44,9 +44,28 @@ maps PRD concepts to the as-built system and records scope decisions per ticket.
   aggregating stage attempts with root / downstream-carried / independent classification
   (earliest-failure precedence per PRD §7.4), repair launch, altered-retest launch.
 
+## Seeded generation delivered (PRD §11)
+
+- `sole-trader-v1` generator: server-only module inside the `case-generate` edge
+  function (never in the client bundle — a learner must not be able to recompute
+  keys from the seed). Deterministic mulberry32 PRNG; constructive sampling so the
+  accounting identities hold by design, then a full §11.4 invariant assertion pass;
+  deterministic resampling on constraint misses; original fictional entities only.
+- Persistence: `generated_cases` (owner-read RLS; written by the function via the
+  service role after JWT verification) + `generated_case_keys` (RLS enabled with
+  **no policies** — deny-all except service role, stricter than authored keys).
+  Seed stored on the case for exact replay (same seed → identical case, verified
+  live through the deployed function).
+- `practice-submit` v4 accepts either `item_id` or `generated_case_id + stage_index`;
+  attempts/error-log rows carry the generated target (`item_id` now nullable with a
+  target check constraint). Review-state updates apply to authored items only.
+- UI: "Generate a fresh case" in the sole-trader family; the case runner handles
+  both sources; results offer "generate an altered case" — an infinite altered-
+  retest supply. Property tests sweep 300 consecutive seeds through the full
+  invariant gate; perfect-run scoring is verified against generated keys.
+
 ## Deliberate deferrals (per PRD phases 2–5)
 
-- Seeded variant generation + invariant gate at generation time (golden cases only for now).
 - Learn/Practice/Exam delivery modes, timers, flagging, auto-submit (Learn behavior only).
 - Confidence capture, mastery state machine, recommendations, analytics dashboards.
 - Skill taxonomy tables (skills live in spine config for the two authored cases).

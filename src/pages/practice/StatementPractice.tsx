@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { fetchPublishedSpines, type PracticeSpine } from '../../lib/practice/api'
+import { Link, useNavigate } from 'react-router-dom'
+import { fetchPublishedSpines, generateCase, type PracticeSpine } from '../../lib/practice/api'
 
 const FAMILY_LABELS: Record<string, string> = {
   sole_trader: 'Sole-trader accounts preparation',
@@ -25,6 +25,20 @@ export default function StatementPractice() {
   const [spines, setSpines] = useState<PracticeSpine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const navigate = useNavigate()
+
+  async function onGenerate() {
+    setGenerating(true)
+    setError(null)
+    try {
+      const res = await generateCase('sole_trader')
+      navigate(`/practice/generated/${res.case_id}`)
+    } catch (e: any) {
+      setError(e.message || 'Generation failed')
+      setGenerating(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -63,7 +77,7 @@ export default function StatementPractice() {
         const group = spines.filter((s) => s.family === family)
         // The altered retest variant is reached from case results, not listed here.
         const listed = group.filter((s) => !(s.config as any)?.is_retest_variant)
-        if (listed.length === 0 && group.length === 0) {
+        if (listed.length === 0 && group.length === 0 && family !== 'sole_trader') {
           return (
             <section key={family}>
               <h3 className="section-h">{FAMILY_LABELS[family]}</h3>
@@ -84,6 +98,22 @@ export default function StatementPractice() {
                   <span className="activity-side">Case</span>
                 </Link>
               ))}
+              {family === 'sole_trader' && (
+                <button
+                  className="activity-card static generate-card"
+                  onClick={onGenerate}
+                  disabled={generating}
+                >
+                  <div className="activity-main">
+                    <strong>🎲 Generate a fresh case</strong>
+                    <span className="muted activity-sub">
+                      A new entity and new numbers every time — same six skills, seeded and
+                      reproducible.
+                    </span>
+                  </div>
+                  <span className="activity-side">{generating ? 'Generating…' : 'New'}</span>
+                </button>
+              )}
             </div>
           </section>
         )

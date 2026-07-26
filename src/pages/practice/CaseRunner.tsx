@@ -1,55 +1,108 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import {
+  fetchGeneratedCase,
   fetchItemsByIds,
   fetchSpine,
   fetchSpineStages,
+  generateCase,
   startSession,
   type LearningItem,
-  type PracticeSpine,
   type SubmitResult,
 } from '../../lib/practice/api'
+import { diagnose, type SpineDiagnosisConfig } from '../../lib/practice/diagnose.ts'
 import { StageRun } from '../../components/practice/StageRun'
 
-import { diagnose, type SpineDiagnosisConfig } from '../../lib/practice/diagnose.ts'
-
-type SpineConfig = SpineDiagnosisConfig
+type StageDef = {
+  title: string
+  item: LearningItem
+  generated?: { caseId: string; stageIndex: number }
+}
+type CaseSource = {
+  title: string
+  config: SpineDiagnosisConfig
+  stages: StageDef[]
+  isGenerated: boolean
+}
 type StageResult = SubmitResult & { item: LearningItem }
 
+// Runs an integrated case from either source: an authored spine
+// (/practice/case/:spineId) or a seeded generated case
+// (/practice/generated/:caseId). Same stages, marking, and diagnosis.
 export default function CaseRunner() {
-  const { spineId } = useParams()
-  const [spine, setSpine] = useState<PracticeSpine | null>(null)
-  const [items, setItems] = useState<LearningItem[]>([])
-  const [stageTitles, setStageTitles] = useState<string[]>([])
+  const { spineId, caseId } = useParams()
+  const navigate = useNavigate()
+  const [source, setSource] = useState<CaseSource | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
   const [results, setResults] = useState<StageResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     let active = true
     async function load() {
       try {
-        const s = await fetchSpine(spineId!)
-        if (!s) {
-          setError('Case not found (it may be unpublished).')
-          return
+        let next: CaseSource | null = null
+        if (caseId) {
+          const row = await fetchGeneratedCase(caseId)
+          if (!row) {
+            setError('Case not found.')
+            return
+          }
+          const stages = (row.stages as any[]).map((s, i) => ({
+            title: s.title || `Stage ${i + 1}`,
+            generated: { caseId: row.id, stageIndex: i },
+            item: {
+              id: `${row.id}#${i}`, // stable draft key; never sent as item_id
+              kind: s.kind,
+              title: s.title,
+              prompt_md: s.prompt_md ?? '',
+              config: s.config,
+              source_slug: null, paper: 'FFA', syllabus_area: null,
+              topic: null, tags: [], difficulty: null, status: 'published',
+              version: 1, created_by: null,
+              created_at: row.created_at, updated_at: row.created_at,
+            } as LearningItem,
+          }))
+          next = {
+            title: row.title,
+            config: row.config as SpineDiagnosisConfig,
+            stages,
+            isGenerated: true,
+          }
+        } else {
+          const s = await fetchSpine(spineId!)
+          if (!s) {
+            setError('Case not found (it may be unpublished).')
+            return
+          }
+          const stageRows = await fetchSpineStages(s.id)
+          const fetched = await fetchItemsByIds(stageRows.map((st) => st.item_id))
+          next = {
+            title: s.title,
+            config: s.config as SpineDiagnosisConfig,
+            stages: stageRows
+              .map((st, i) => ({
+                title: st.title || `Stage ${i + 1}`,
+                item: fetched.find((it) => it.id === st.item_id)!,
+              }))
+              .filter((st) => st.item),
+            isGenerated: false,
+          }
         }
-        const stages = await fetchSpineStages(s.id)
-        const fetched = await fetchItemsByIds(stages.map((st) => st.item_id))
-        const ordered = stages
-          .map((st) => fetched.find((i) => i.id === st.item_id))
-          .filter(Boolean) as LearningItem[]
-        if (!active) return
-        setSpine(s)
-        setItems(ordered)
-        setStageTitles(stages.map((st, i) => st.title || `Stage ${i + 1}`))
+        if (!active || !next) return
+        setSource(next)
         setIndex(0)
         setResults([])
-        if (ordered.length > 0) {
-          const sess = await startSession(ordered[0].id, { lane: 'statements', spineId: s.id })
+        if (next.stages.length > 0) {
+          const sess = await startSession(caseId ? null : next.stages[0].item.id, {
+            lane: 'statements',
+            spineId: spineId ?? undefined,
+            generatedCaseId: caseId ?? undefined,
+          })
           if (active) setSessionId(sess.id)
         }
       } catch (e: any) {
@@ -59,14 +112,15 @@ export default function CaseRunner() {
       }
     }
     setLoading(true)
+    setError(null)
     void load()
     return () => {
       active = false
     }
-  }, [spineId])
+  }, [spineId, caseId])
 
-  const config = (spine?.config ?? {}) as SpineConfig
-  const done = items.length > 0 && index >= items.length
+  const config = source?.config ?? {}
+  const done = !!source && source.stages.length > 0 && index >= source.stages.length
 
   useEffect(() => {
     if (done && sessionId) {
@@ -96,8 +150,20 @@ export default function CaseRunner() {
     [done, config.skills, results],
   )
 
+  async function generateAnother() {
+    setGenerating(true)
+    try {
+      const res = await generateCase('sole_trader')
+      navigate(`/practice/generated/${res.case_id}`)
+    } catch (e: any) {
+      setError(e.message || 'Generation failed')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (loading) return <div className="page muted">Loading case…</div>
-  if (error || !spine)
+  if (error || !source)
     return (
       <div className="page">
         <h1>Case unavailable</h1>
@@ -110,7 +176,7 @@ export default function CaseRunner() {
 
   const stageNav = (
     <div className="stage-nav" aria-label="Case stages">
-      {stageTitles.map((t, i) => (
+      {source.stages.map((s, i) => (
         <span
           key={i}
           className={
@@ -118,7 +184,7 @@ export default function CaseRunner() {
           }
         >
           {i < index ? '✓ ' : ''}
-          {t}
+          {s.title}
           {i < index && results[i] ? (
             <span className="muted"> {results[i].cell_score}/{results[i].cell_max}</span>
           ) : null}
@@ -133,15 +199,16 @@ export default function CaseRunner() {
       <div className="page practice-page">
         <div className="crumb muted">
           <Link to="/practice">Practice</Link> ·{' '}
-          <Link to="/practice/statements">Financial statements</Link> · {spine.title}
+          <Link to="/practice/statements">Financial statements</Link> · {source.title}
         </div>
         <div className="page-head">
           <h1>Case complete</h1>
         </div>
-        {config.is_retest_variant && (
+        {(config.is_retest_variant || source.isGenerated) && (
           <p className="hint">
-            This was the altered retest — a clean run here is real evidence of transfer, not
-            memorisation.
+            {source.isGenerated
+              ? 'This was a freshly generated variant — a clean run here is real evidence of transfer.'
+              : 'This was the altered retest — a clean run here is real evidence of transfer, not memorisation.'}
           </p>
         )}
         <div className="result-summary" role="status">
@@ -158,7 +225,9 @@ export default function CaseRunner() {
           {diagnosis && (
             <div className="result-score">
               <span className="result-num">{diagnosis.failedSkills.length}</span>
-              <span className="result-caption">root error{diagnosis.failedSkills.length === 1 ? '' : 's'}</span>
+              <span className="result-caption">
+                root error{diagnosis.failedSkills.length === 1 ? '' : 's'}
+              </span>
             </div>
           )}
         </div>
@@ -166,9 +235,13 @@ export default function CaseRunner() {
         <h3 className="section-h">Stages</h3>
         <div className="activity-list">
           {results.map((r, i) => (
-            <Link key={r.attempt_id} to={`/practice/attempt/${r.attempt_id}`} className="activity-card">
+            <Link
+              key={r.attempt_id}
+              to={`/practice/attempt/${r.attempt_id}`}
+              className="activity-card"
+            >
               <div className="activity-main">
-                <strong>{stageTitles[i]}</strong>
+                <strong>{source.stages[i].title}</strong>
                 <span className="muted activity-sub">{r.item.title}</span>
               </div>
               <span className="activity-side">
@@ -215,8 +288,7 @@ export default function CaseRunner() {
                         ✓
                       </span>
                       <div>
-                        <strong>Solid:</strong>{' '}
-                        {diagnosis.okSkills.map((s) => s.label).join(', ')}
+                        <strong>Solid:</strong> {diagnosis.okSkills.map((s) => s.label).join(', ')}
                       </div>
                     </div>
                   </div>
@@ -233,11 +305,16 @@ export default function CaseRunner() {
         )}
 
         <div className="practice-actions after">
-          {config.retest_spine_id && (
-            <Link className="btn primary" to={`/practice/case/${config.retest_spine_id}`}>
-              {diagnosis && diagnosis.failedSkills.length > 0
-                ? 'Repair first, then try the altered case'
-                : 'Prove it: altered case →'}
+          <button className="btn primary" onClick={generateAnother} disabled={generating}>
+            {generating
+              ? 'Generating…'
+              : diagnosis && diagnosis.failedSkills.length > 0
+                ? 'Repair first, then generate an altered case'
+                : '🎲 Prove it again: generate an altered case'}
+          </button>
+          {!source.isGenerated && config.retest_spine_id && (
+            <Link className="btn" to={`/practice/case/${config.retest_spine_id}`}>
+              Authored altered case
             </Link>
           )}
           <Link className="btn" to="/practice/statements">
@@ -248,26 +325,27 @@ export default function CaseRunner() {
     )
   }
 
-  const item = items[index]
+  const stage = source.stages[index]
   return (
     <div className="page practice-page">
       <div className="crumb muted">
         <Link to="/practice">Practice</Link> ·{' '}
-        <Link to="/practice/statements">Financial statements</Link> · {spine.title}
+        <Link to="/practice/statements">Financial statements</Link> · {source.title}
       </div>
       <div className="page-head">
-        <h1>{spine.title}</h1>
+        <h1>{source.title}</h1>
       </div>
       {stageNav}
       <div className="question-card">
-        <h3 className="stage-title">{stageTitles[index]}</h3>
+        <h3 className="stage-title">{stage.title}</h3>
         <StageRun
-          key={item.id}
-          item={item}
+          key={stage.item.id}
+          item={stage.item}
+          generated={stage.generated}
           sessionId={sessionId}
-          nextLabel={index + 1 < items.length ? 'Next stage →' : 'Finish case'}
+          nextLabel={index + 1 < source.stages.length ? 'Next stage →' : 'Finish case'}
           onDone={(result) => {
-            setResults((prev) => [...prev, { ...result, item }])
+            setResults((prev) => [...prev, { ...result, item: stage.item }])
             setIndex((i) => i + 1)
             window.scrollTo(0, 0)
           }}

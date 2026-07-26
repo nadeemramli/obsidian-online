@@ -26,10 +26,12 @@ export type Database = {
           created_at: string
           duration_ms: number | null
           feedback: Json
+          generated_case_id: string | null
           id: string
-          item_id: string
+          item_id: string | null
           item_version: number
           session_id: string | null
+          stage_index: number | null
           tx_correct: number
           tx_total: number
           user_id: string
@@ -43,10 +45,12 @@ export type Database = {
           created_at?: string
           duration_ms?: number | null
           feedback: Json
+          generated_case_id?: string | null
           id?: string
-          item_id: string
+          item_id?: string | null
           item_version: number
           session_id?: string | null
+          stage_index?: number | null
           tx_correct: number
           tx_total: number
           user_id?: string
@@ -60,10 +64,12 @@ export type Database = {
           created_at?: string
           duration_ms?: number | null
           feedback?: Json
+          generated_case_id?: string | null
           id?: string
-          item_id?: string
+          item_id?: string | null
           item_version?: number
           session_id?: string | null
+          stage_index?: number | null
           tx_correct?: number
           tx_total?: number
           user_id?: string
@@ -91,8 +97,9 @@ export type Database = {
           cell: string
           created_at: string
           expected_label: string
+          generated_case_id: string | null
           id: string
-          item_id: string
+          item_id: string | null
           paper: string | null
           resolved: boolean
           row_id: string
@@ -106,8 +113,9 @@ export type Database = {
           cell: string
           created_at?: string
           expected_label?: string
+          generated_case_id?: string | null
           id?: string
-          item_id: string
+          item_id?: string | null
           paper?: string | null
           resolved?: boolean
           row_id: string
@@ -121,8 +129,9 @@ export type Database = {
           cell?: string
           created_at?: string
           expected_label?: string
+          generated_case_id?: string | null
           id?: string
-          item_id?: string
+          item_id?: string | null
           paper?: string | null
           resolved?: boolean
           row_id?: string
@@ -285,9 +294,72 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_case_keys: {
+        Row: {
+          case_id: string
+          created_at: string
+          keys: Json
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          keys: Json
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          keys?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_case_keys_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: true
+            referencedRelation: "generated_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_cases: {
+        Row: {
+          config: Json
+          created_at: string
+          family: string
+          id: string
+          seed: number
+          stages: Json
+          template: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          family: string
+          id?: string
+          seed: number
+          stages: Json
+          template: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          family?: string
+          id?: string
+          seed?: number
+          stages?: Json
+          template?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       practice_sessions: {
         Row: {
           completed_at: string | null
+          generated_case_id: string | null
           id: string
           item_id: string | null
           lane: string
@@ -299,6 +371,7 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          generated_case_id?: string | null
           id?: string
           item_id?: string | null
           lane?: string
@@ -310,6 +383,7 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          generated_case_id?: string | null
           id?: string
           item_id?: string | null
           lane?: string

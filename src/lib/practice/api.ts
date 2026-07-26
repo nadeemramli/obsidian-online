@@ -106,8 +106,13 @@ export async function fetchSpineStages(spineId: string): Promise<SpineStage[]> {
 // ---------- learner: sessions & attempts ----------
 
 export async function startSession(
-  itemId: string,
-  opts?: { lane?: 'specific' | 'statements'; quizId?: string; spineId?: string },
+  itemId: string | null,
+  opts?: {
+    lane?: 'specific' | 'statements'
+    quizId?: string
+    spineId?: string
+    generatedCaseId?: string
+  },
 ): Promise<PracticeSession> {
   const { data, error } = await supabase
     .from('practice_sessions')
@@ -116,6 +121,7 @@ export async function startSession(
       lane: opts?.lane ?? 'specific',
       quiz_id: opts?.quizId ?? null,
       spine_id: opts?.spineId ?? null,
+      generated_case_id: opts?.generatedCaseId ?? null,
     })
     .select()
     .single()
@@ -135,7 +141,9 @@ export type SubmitResult = {
 }
 
 export async function submitAttempt(input: {
-  item_id: string
+  item_id?: string
+  generated_case_id?: string
+  stage_index?: number
   session_id: string | null
   client_submission_id: string
   answers: MatrixResponse
@@ -171,6 +179,44 @@ export async function fetchAttempts(limit = 50): Promise<Attempt[]> {
 
 export async function fetchAttempt(id: string): Promise<Attempt | null> {
   const { data, error } = await supabase.from('attempts').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+// ---------- learner: generated cases ----------
+
+export type GeneratedCaseRow = Tables<'generated_cases'>
+
+export async function generateCase(family = 'sole_trader', seed?: number): Promise<{
+  case_id: string
+  seed: number
+  title: string
+}> {
+  const { data, error } = await supabase.functions.invoke('case-generate', {
+    body: seed !== undefined ? { family, seed } : { family },
+  })
+  if (error) {
+    const ctx = (error as any).context as Response | undefined
+    let message = error.message || 'Generation failed'
+    try {
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json()
+        if (body?.error) message = body.error
+      }
+    } catch {
+      /* keep the generic message */
+    }
+    throw new Error(message)
+  }
+  return data as { case_id: string; seed: number; title: string }
+}
+
+export async function fetchGeneratedCase(id: string): Promise<GeneratedCaseRow | null> {
+  const { data, error } = await supabase
+    .from('generated_cases')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
   if (error) throw error
   return data
 }

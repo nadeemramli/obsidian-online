@@ -19,7 +19,7 @@ export default function AttemptView() {
       .then(async (a) => {
         if (!active) return
         setAttempt(a)
-        if (a) {
+        if (a?.item_id) {
           try {
             setItem(await fetchItem(a.item_id))
           } catch {

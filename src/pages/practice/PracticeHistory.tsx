@@ -69,7 +69,11 @@ export default function PracticeHistory() {
               {attempts.map((a) => (
                 <tr key={a.id}>
                   <td>{new Date(a.created_at).toLocaleString()}</td>
-                  <td>{titles.get(a.item_id) ?? 'Activity'}</td>
+                  <td>
+                    {a.item_id
+                      ? titles.get(a.item_id) ?? 'Activity'
+                      : `Generated case — stage ${(a.stage_index ?? 0) + 1}`}
+                  </td>
                   <td className="num">
                     {a.cell_score}/{a.cell_max}
                   </td>

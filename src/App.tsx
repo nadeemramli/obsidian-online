@@ -53,6 +53,7 @@ export default function App() {
                 <Route path="/practice/statements" element={<StatementPractice />} />
                 <Route path="/practice/quiz/:quizId" element={<QuizRunner />} />
                 <Route path="/practice/case/:spineId" element={<CaseRunner />} />
+                <Route path="/practice/generated/:caseId" element={<CaseRunner />} />
                 <Route path="/practice/run/:itemId" element={<PracticeRun />} />
                 <Route path="/practice/attempt/:attemptId" element={<AttemptView />} />
                 <Route path="/practice/history" element={<PracticeHistory />} />
