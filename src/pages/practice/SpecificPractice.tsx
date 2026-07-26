@@ -81,7 +81,7 @@ export default function SpecificPractice() {
           <h3 className="section-h">Quizzes</h3>
           <div className="activity-list">
             {quizzes.map((q) => (
-              <Link key={q.id} to={`/practice/quiz/${q.id}`} className="activity-card">
+              <div key={q.id} className="activity-card static">
                 <div className="activity-main">
                   <strong>{q.title}</strong>
                   <span className="muted activity-sub">
@@ -90,8 +90,15 @@ export default function SpecificPractice() {
                       .join(' · ')}
                   </span>
                 </div>
-                <span className="activity-side">Quiz</span>
-              </Link>
+                <span className="activity-side builder-actions">
+                  <Link className="btn" to={`/practice/quiz/${q.id}`}>
+                    Learn
+                  </Link>
+                  <Link className="btn primary" to={`/practice/quiz/${q.id}?mode=exam`}>
+                    ⏱ Exam
+                  </Link>
+                </span>
+              </div>
             ))}
           </div>
         </>

@@ -6,6 +6,11 @@ import { MatrixRunner } from '../../components/practice/MatrixRunner'
 import { JournalRunner } from '../../components/practice/JournalRunner'
 import { StatementRunner } from '../../components/practice/StatementRunner'
 import {
+  MultiChoiceRunner,
+  NumericRunner,
+  SingleChoiceRunner,
+} from '../../components/practice/ObjectiveRunners'
+import {
   countAnswered,
   totalCells,
   type MatrixConfig,
@@ -14,6 +19,9 @@ import {
 import {
   validateJournalConfig,
   validateMatrixConfig,
+  validateMultiChoiceConfig,
+  validateNumericConfig,
+  validateSingleChoiceConfig,
   validateStatementConfig,
 } from './validate.ts'
 
@@ -77,6 +85,31 @@ export const questionKinds: Record<string, KindDefinition> = {
     label: 'Statement construction',
     Runner: StatementRunner,
     parseConfig: (raw) => (validateStatementConfig(raw).length === 0 ? raw : null),
+    countAnswered,
+    totalCells,
+    sanitize: (config, response) => sanitizeSelects(config, response, ['amount']),
+  },
+  single_select: {
+    label: 'Single choice',
+    Runner: SingleChoiceRunner,
+    parseConfig: (raw) => (validateSingleChoiceConfig(raw).length === 0 ? raw : null),
+    countAnswered,
+    totalCells,
+    sanitize: (config, response) => sanitizeSelects(config, response),
+  },
+  multi_select: {
+    label: 'Multiple response',
+    Runner: MultiChoiceRunner,
+    parseConfig: (raw) => (validateMultiChoiceConfig(raw).length === 0 ? raw : null),
+    countAnswered,
+    totalCells,
+    // The comma-joined selection is free text from the option universe.
+    sanitize: (config, response) => sanitizeSelects(config, response, ['choices']),
+  },
+  numeric_entry: {
+    label: 'Numeric entry',
+    Runner: NumericRunner,
+    parseConfig: (raw) => (validateNumericConfig(raw).length === 0 ? raw : null),
     countAnswered,
     totalCells,
     sanitize: (config, response) => sanitizeSelects(config, response, ['amount']),

@@ -1035,6 +1035,74 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
 .stage-chip.done { color: var(--ok); border-color: rgba(74, 222, 128, 0.4); }
 .stage-title { margin: 0 0 4px; font-size: 16px; }
 
+/* --- Objective kinds --- */
+.choice-list { border: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.choice-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 11px 14px;
+  cursor: pointer;
+  font-size: 14.5px;
+}
+.choice-row:hover { border-color: var(--accent); }
+.choice-row.picked { border-color: var(--accent); background: rgba(167, 139, 250, 0.08); }
+.choice-row input { width: auto; margin-top: 3px; accent-color: var(--accent); }
+.numeric-answer { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; max-width: 320px; }
+.numeric-label { font-size: 13.5px; color: var(--muted); font-weight: 600; }
+.numeric-answer input { font-variant-numeric: tabular-nums; text-align: right; font-size: 16px; }
+
+/* --- Exam mode --- */
+.exam-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+}
+.exam-timer { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; }
+.exam-timer.low { color: var(--err); }
+.exam-palette { display: flex; gap: 6px; flex-wrap: wrap; }
+.palette-chip {
+  width: 34px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  position: relative;
+}
+.palette-chip.answered { border-color: rgba(74, 222, 128, 0.5); color: var(--text); }
+.palette-chip.current { border-color: var(--accent); background: rgba(167, 139, 250, 0.12); color: var(--text); }
+.palette-chip.flagged::after {
+  content: '⚑';
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  font-size: 10px;
+  color: var(--warn);
+}
+.exam-question-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.btn.flagged { border-color: var(--warn); color: var(--warn); }
+.exam-results-item { margin-top: 18px; }
+.exam-results-item summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+
 button.generate-card {
   width: 100%;
   text-align: left;

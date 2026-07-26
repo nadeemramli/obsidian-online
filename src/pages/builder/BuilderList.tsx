@@ -63,18 +63,44 @@ export default function BuilderList() {
     void reload()
   }, [])
 
-  async function newQuestion(kind: 'matrix_select' | 'journal_entry' | 'statement_prep') {
+  async function newQuestion(
+    kind:
+      | 'matrix_select'
+      | 'journal_entry'
+      | 'statement_prep'
+      | 'single_select'
+      | 'multi_select'
+      | 'numeric_entry',
+  ) {
     setBusy(true)
     try {
-      const titles = {
+      const titles: Record<string, string> = {
         matrix_select: 'Untitled matrix question',
         journal_entry: 'Untitled journal question',
         statement_prep: 'Untitled statement question',
+        single_select: 'Untitled single-choice question',
+        multi_select: 'Untitled multiple-response question',
+        numeric_entry: 'Untitled numeric question',
       }
-      const configs = {
+      const configs: Record<string, Json> = {
         matrix_select: DEFAULT_MATRIX_CONFIG,
         journal_entry: DEFAULT_JOURNAL_CONFIG,
         statement_prep: DEFAULT_STATEMENT_CONFIG,
+        single_select: {
+          columns: [{ id: 'choice', label: 'Answer' }],
+          rows: [{ id: 'answer', label: 'Your answer' }],
+          options: [],
+        } as unknown as Json,
+        multi_select: {
+          columns: [{ id: 'choices', label: 'Your decision' }],
+          rows: [{ id: 'answer', label: 'Your answer' }],
+          options: [],
+        } as unknown as Json,
+        numeric_entry: {
+          columns: [{ id: 'amount', label: 'Amount ($)' }],
+          rows: [{ id: 'answer', label: 'Amount ($)' }],
+          options: [],
+        } as unknown as Json,
       }
       const item = await createDraftItem({ kind, title: titles[kind], config: configs[kind] })
       navigate(`/builder/item/${item.id}`)
@@ -162,6 +188,15 @@ export default function BuilderList() {
           </button>
           <button className="btn primary" onClick={() => newQuestion('statement_prep')} disabled={busy}>
             + Statement
+          </button>
+          <button className="btn primary" onClick={() => newQuestion('single_select')} disabled={busy}>
+            + MCQ
+          </button>
+          <button className="btn primary" onClick={() => newQuestion('multi_select')} disabled={busy}>
+            + Multi
+          </button>
+          <button className="btn primary" onClick={() => newQuestion('numeric_entry')} disabled={busy}>
+            + Numeric
           </button>
           <button className="btn" onClick={newQuiz} disabled={busy}>
             + Quiz

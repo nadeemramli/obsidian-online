@@ -6,11 +6,15 @@
 // copy deployed with the edge function; the unit suite fails if the two drift.
 
 import type {
+  ChoiceConfig,
   JournalAnswerKey,
   JournalConfig,
   MatrixAnswerKey,
   MatrixConfig,
   MatrixResponse,
+  MultiChoiceKey,
+  NumericKey,
+  SingleChoiceKey,
   StatementAnswerKey,
   StatementConfig,
 } from './scoring.ts'
@@ -356,6 +360,186 @@ export function asStatementConfig(v: unknown): StatementConfig {
 }
 export function asStatementKey(v: unknown): StatementAnswerKey {
   return v as StatementAnswerKey
+}
+
+// ---------------------------------------------------------------------------
+// Objective kinds: single_select / multi_select / numeric_entry
+// ---------------------------------------------------------------------------
+
+function validateChoiceShape(
+  config: unknown,
+  columnId: string,
+  issues: ValidationIssue[],
+): void {
+  if (!isRecord(config)) {
+    issues.push({ path: 'config', message: 'must be an object' })
+    return
+  }
+  checkIdLabelList(config.options, 'options', issues)
+  if (Array.isArray(config.options) && config.options.length < 2) {
+    issues.push({ path: 'options', message: 'needs at least two options' })
+  }
+  if (
+    !Array.isArray(config.rows) ||
+    config.rows.length !== 1 ||
+    !isRecord(config.rows[0]) ||
+    config.rows[0].id !== 'answer'
+  ) {
+    issues.push({ path: 'rows', message: 'needs exactly one row with id "answer"' })
+  }
+  if (
+    !Array.isArray(config.columns) ||
+    config.columns.length !== 1 ||
+    !isRecord(config.columns[0]) ||
+    config.columns[0].id !== columnId
+  ) {
+    issues.push({ path: 'columns', message: `needs exactly one column with id "${columnId}"` })
+  }
+}
+
+export function validateSingleChoiceConfig(config: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  validateChoiceShape(config, 'choice', issues)
+  return issues
+}
+
+export function validateSingleChoiceKey(config: ChoiceConfig, key: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(key)) return [{ path: 'answer_key', message: 'must be an object' }]
+  const optionIds = new Set(config.options.map((o) => o.id))
+  if (typeof key.correct !== 'string' || !optionIds.has(key.correct)) {
+    issues.push({ path: 'answer_key.correct', message: 'correct answer must be one of the options' })
+  }
+  if (typeof key.explanation_md !== 'string' || !key.explanation_md.trim()) {
+    issues.push({ path: 'answer_key.explanation_md', message: 'an explanation is required' })
+  }
+  return issues
+}
+
+export function validateSingleChoiceResponse(
+  config: ChoiceConfig,
+  response: unknown,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(response)) return [{ path: 'answers', message: 'must be an object' }]
+  const optionIds = new Set(config.options.map((o) => o.id))
+  for (const [rowId, cells] of Object.entries(response)) {
+    if (rowId !== 'answer' || !isRecord(cells)) {
+      issues.push({ path: `answers.${rowId}`, message: 'unknown row' })
+      continue
+    }
+    for (const [colId, v] of Object.entries(cells)) {
+      if (colId !== 'choice') issues.push({ path: `answers.answer.${colId}`, message: 'unknown column' })
+      else if (v !== undefined && (typeof v !== 'string' || !optionIds.has(v)))
+        issues.push({ path: 'answers.answer.choice', message: 'unknown option' })
+    }
+  }
+  return issues
+}
+
+export function validateMultiChoiceConfig(config: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  validateChoiceShape(config, 'choices', issues)
+  return issues
+}
+
+export function validateMultiChoiceKey(config: ChoiceConfig, key: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(key)) return [{ path: 'answer_key', message: 'must be an object' }]
+  const optionIds = new Set(config.options.map((o) => o.id))
+  if (
+    !Array.isArray(key.correct) ||
+    key.correct.length === 0 ||
+    key.correct.some((c) => typeof c !== 'string' || !optionIds.has(c))
+  ) {
+    issues.push({
+      path: 'answer_key.correct',
+      message: 'correct answers must be a non-empty subset of the options',
+    })
+  }
+  if (Array.isArray(key.correct) && key.correct.length === config.options.length) {
+    issues.push({ path: 'answer_key.correct', message: 'at least one option must be a distractor' })
+  }
+  if (
+    'policy' in key &&
+    key.policy !== undefined &&
+    key.policy !== 'per_option' &&
+    key.policy !== 'all_or_nothing'
+  ) {
+    issues.push({ path: 'answer_key.policy', message: 'policy must be per_option or all_or_nothing' })
+  }
+  if (typeof key.explanation_md !== 'string' || !key.explanation_md.trim()) {
+    issues.push({ path: 'answer_key.explanation_md', message: 'an explanation is required' })
+  }
+  return issues
+}
+
+export function validateMultiChoiceResponse(
+  config: ChoiceConfig,
+  response: unknown,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(response)) return [{ path: 'answers', message: 'must be an object' }]
+  const optionIds = new Set(config.options.map((o) => o.id))
+  for (const [rowId, cells] of Object.entries(response)) {
+    if (rowId !== 'answer' || !isRecord(cells)) {
+      issues.push({ path: `answers.${rowId}`, message: 'unknown row' })
+      continue
+    }
+    for (const [colId, v] of Object.entries(cells)) {
+      if (colId !== 'choices') issues.push({ path: `answers.answer.${colId}`, message: 'unknown column' })
+      else if (v !== undefined) {
+        if (typeof v !== 'string') {
+          issues.push({ path: 'answers.answer.choices', message: 'must be a string' })
+        } else if (
+          v.split(',').map((s) => s.trim()).filter(Boolean).some((id) => !optionIds.has(id))
+        ) {
+          issues.push({ path: 'answers.answer.choices', message: 'unknown option' })
+        }
+      }
+    }
+  }
+  return issues
+}
+
+export function validateNumericConfig(config: unknown): ValidationIssue[] {
+  const issues = validateStatementConfig(config)
+  if (isRecord(config) && Array.isArray(config.rows) && config.rows.length !== 1) {
+    issues.push({ path: 'rows', message: 'numeric questions have exactly one answer row' })
+  }
+  return issues
+}
+
+export function validateNumericKey(_config: StatementConfig, key: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(key)) return [{ path: 'answer_key', message: 'must be an object' }]
+  if (typeof key.amount !== 'number' || !isFinite(key.amount)) {
+    issues.push({ path: 'answer_key.amount', message: 'a correct amount is required' })
+  }
+  if (
+    'tolerance' in key &&
+    key.tolerance !== undefined &&
+    (typeof key.tolerance !== 'number' || key.tolerance < 0)
+  ) {
+    issues.push({ path: 'answer_key.tolerance', message: 'tolerance must be a non-negative number' })
+  }
+  if (typeof key.explanation_md !== 'string' || !key.explanation_md.trim()) {
+    issues.push({ path: 'answer_key.explanation_md', message: 'an explanation is required' })
+  }
+  return issues
+}
+
+export function asChoiceConfig(v: unknown): ChoiceConfig {
+  return v as ChoiceConfig
+}
+export function asSingleChoiceKey(v: unknown): SingleChoiceKey {
+  return v as SingleChoiceKey
+}
+export function asMultiChoiceKey(v: unknown): MultiChoiceKey {
+  return v as MultiChoiceKey
+}
+export function asNumericKey(v: unknown): NumericKey {
+  return v as NumericKey
 }
 
 // Convenience for typed callers once validation passed.

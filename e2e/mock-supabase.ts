@@ -4,6 +4,9 @@ import {
   scoreMatrix,
   scoreJournal,
   scoreStatement,
+  scoreSingleChoice,
+  scoreMultiChoice,
+  scoreNumeric,
   type MatrixConfig,
   type MatrixAnswerKey,
   type JournalConfig,
@@ -596,20 +599,27 @@ export class MockSupabase {
         config = item.config
         answerKey = key.answer_key
       }
+      const answers = body.answers ?? {}
       const feedback =
         kind === 'journal_entry'
           ? scoreJournal(
               config as unknown as JournalConfig,
               answerKey as unknown as JournalAnswerKey,
-              body.answers ?? {},
+              answers,
             )
           : kind === 'statement_prep'
             ? scoreStatement(
                 config as unknown as StatementConfig,
                 answerKey as unknown as StatementAnswerKey,
-                body.answers ?? {},
+                answers,
               )
-            : scoreMatrix(config as MatrixConfig, answerKey as MatrixAnswerKey, body.answers ?? {})
+            : kind === 'single_select'
+              ? scoreSingleChoice(config as any, answerKey as any, answers)
+              : kind === 'multi_select'
+                ? scoreMultiChoice(config as any, answerKey as any, answers)
+                : kind === 'numeric_entry'
+                  ? scoreNumeric(config as any, answerKey as any, answers)
+                  : scoreMatrix(config as MatrixConfig, answerKey as MatrixAnswerKey, answers)
       const overall = item
         ? (this.answers.find((a) => a.item_id === item!.id && a.version === item!.version)
             ?.overall_explanation_md ?? null)

@@ -43,7 +43,13 @@ export type RowFeedback = {
 }
 
 export type MatrixFeedback = {
-  kind: 'matrix_select' | 'journal_entry' | 'statement_prep'
+  kind:
+    | 'matrix_select'
+    | 'journal_entry'
+    | 'statement_prep'
+    | 'single_select'
+    | 'multi_select'
+    | 'numeric_entry'
   // Self-contained snapshot: column and option labels are embedded at scoring
   // time so a stored attempt stays readable even after the question is edited.
   columns: MatrixColumn[]
@@ -284,6 +290,134 @@ export function scoreStatement(
     tx_correct: txCorrect,
     tx_total: config.rows.length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Objective kinds (PRD §10.2): single_select, multi_select, numeric_entry.
+// All use the canonical rows/columns shape so the progress helpers and the
+// self-contained feedback snapshot work unchanged:
+//   single_select : rows [{id:'answer'}], columns [{id:'choice'}]
+//                   response { answer: { choice: optionId } }
+//   multi_select  : rows [{id:'answer'}], columns [{id:'choices'}]
+//                   response { answer: { choices: 'id1,id2' } } (sorted, comma-joined)
+//   numeric_entry : rows [{id:'answer'}], columns [{id:'amount'}]
+//                   response { answer: { amount: '123' } }
+// ---------------------------------------------------------------------------
+
+export type ChoiceConfig = {
+  note_md?: string
+  columns: MatrixColumn[]
+  rows: MatrixRow[]
+  options: MatrixOption[]
+}
+
+export type SingleChoiceKey = { correct: string; explanation_md: string }
+
+export function scoreSingleChoice(
+  config: ChoiceConfig,
+  key: SingleChoiceKey,
+  response: MatrixResponse,
+): MatrixFeedback {
+  const raw = response?.answer?.choice
+  const selected = typeof raw === 'string' && raw ? raw : null
+  const ok = selected === key.correct
+  const optionLabels: Record<string, string> = {}
+  for (const o of config.options) optionLabels[o.id] = o.label
+  return {
+    kind: 'single_select',
+    columns: [{ id: 'choice', label: 'Answer' }],
+    option_labels: optionLabels,
+    rows: [
+      {
+        row_id: 'answer',
+        row_label: config.rows[0]?.label ?? 'Your answer',
+        cells: [{ column_id: 'choice', selected, correct: key.correct, ok }],
+        row_correct: ok,
+        explanation_md: key.explanation_md,
+      },
+    ],
+    cell_score: ok ? 1 : 0,
+    cell_max: 1,
+    tx_correct: ok ? 1 : 0,
+    tx_total: 1,
+  }
+}
+
+export type MultiChoiceKey = {
+  correct: string[]
+  policy?: 'per_option' | 'all_or_nothing' // default per_option
+  explanation_md: string
+}
+
+export function parseMultiSelection(raw: string | undefined | null): string[] {
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  return raw.split(',').map((s) => s.trim()).filter(Boolean).sort()
+}
+
+export function scoreMultiChoice(
+  config: ChoiceConfig,
+  key: MultiChoiceKey,
+  response: MatrixResponse,
+): MatrixFeedback {
+  const selectedIds = new Set(parseMultiSelection(response?.answer?.choices))
+  const correctIds = new Set(key.correct)
+  const policy = key.policy ?? 'per_option'
+
+  const optionLabels: Record<string, string> = {
+    __sel: 'Selected',
+    __not: 'Not selected',
+  }
+  for (const o of config.options) optionLabels[o.id] = o.label
+
+  // One feedback row per option: was the include/exclude decision right?
+  const rows: RowFeedback[] = config.options.map((o) => {
+    const chose = selectedIds.has(o.id)
+    const should = correctIds.has(o.id)
+    const ok = chose === should
+    return {
+      row_id: o.id,
+      row_label: o.label,
+      cells: [
+        {
+          column_id: 'choices',
+          selected: chose ? '__sel' : '__not',
+          correct: should ? '__sel' : '__not',
+          ok,
+        },
+      ],
+      row_correct: ok,
+      explanation_md: '',
+    }
+  })
+  const perOptionScore = rows.filter((r) => r.row_correct).length
+  const allRight = perOptionScore === config.options.length
+  if (rows.length > 0) rows[rows.length - 1].explanation_md = key.explanation_md
+
+  return {
+    kind: 'multi_select',
+    columns: [{ id: 'choices', label: 'Your decision' }],
+    option_labels: optionLabels,
+    rows,
+    cell_score: policy === 'per_option' ? perOptionScore : allRight ? 1 : 0,
+    cell_max: policy === 'per_option' ? config.options.length : 1,
+    tx_correct: allRight ? 1 : 0,
+    tx_total: 1,
+  }
+}
+
+export type NumericKey = { amount: number; tolerance?: number; explanation_md: string }
+
+export function scoreNumeric(
+  config: StatementConfig,
+  key: NumericKey,
+  response: MatrixResponse,
+): MatrixFeedback {
+  const fb = scoreStatement(
+    config,
+    { rows: { answer: { amount: key.amount, tolerance: key.tolerance, explanation_md: key.explanation_md } } },
+    response,
+  )
+  return { ...fb, kind: 'numeric_entry' }
 }
 
 // How many cells of the matrix have an answer selected (for the progress meter).

@@ -24,6 +24,7 @@ import { MatrixRunner } from '../../components/practice/MatrixRunner'
 import { MatrixResults } from '../../components/practice/MatrixResults'
 import { JournalEditor } from './JournalEditor'
 import { StatementEditor } from './StatementEditor'
+import { ObjectiveEditor } from './ObjectiveEditor'
 
 type RowDraft = { id: string; label: string; debit: string; credit: string; explanation: string }
 type OptionDraft = { id: string; label: string }
@@ -312,6 +313,8 @@ export default function BuilderItem() {
   // Other kinds get their own editor; this component stays the matrix editor.
   if (item.kind === 'journal_entry') return <JournalEditor item={item} />
   if (item.kind === 'statement_prep') return <StatementEditor item={item} />
+  if (['single_select', 'multi_select', 'numeric_entry'].includes(item.kind))
+    return <ObjectiveEditor item={item} />
   if (item.kind !== 'matrix_select')
     return (
       <div className="page">

@@ -15,7 +15,15 @@
 // attempt. scoring.ts / validate.ts are byte-for-byte copies of
 // src/lib/practice/*.ts — the unit suite fails if they drift.
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { scoreMatrix, scoreJournal, scoreStatement, type MatrixFeedback } from './scoring.ts'
+import {
+  scoreMatrix,
+  scoreJournal,
+  scoreStatement,
+  scoreSingleChoice,
+  scoreMultiChoice,
+  scoreNumeric,
+  type MatrixFeedback,
+} from './scoring.ts'
 import {
   validateMatrixConfig,
   validateMatrixKey,
@@ -26,6 +34,14 @@ import {
   validateStatementConfig,
   validateStatementKey,
   validateStatementResponse,
+  validateSingleChoiceConfig,
+  validateSingleChoiceKey,
+  validateSingleChoiceResponse,
+  validateMultiChoiceConfig,
+  validateMultiChoiceKey,
+  validateMultiChoiceResponse,
+  validateNumericConfig,
+  validateNumericKey,
   asMatrixConfig,
   asMatrixKey,
   asMatrixResponse,
@@ -33,6 +49,10 @@ import {
   asJournalKey,
   asStatementConfig,
   asStatementKey,
+  asChoiceConfig,
+  asSingleChoiceKey,
+  asMultiChoiceKey,
+  asNumericKey,
 } from './validate.ts'
 
 // Per-kind validation + scoring dispatch. Registering a kind here mirrors the
@@ -63,6 +83,24 @@ const KINDS: Record<
     validateResponse: (c, r) => validateStatementResponse(asStatementConfig(c), r),
     validateKey: (c, k) => validateStatementKey(asStatementConfig(c), k),
     score: (c, k, r) => scoreStatement(asStatementConfig(c), asStatementKey(k), asMatrixResponse(r)),
+  },
+  single_select: {
+    validateConfig: validateSingleChoiceConfig,
+    validateResponse: (c, r) => validateSingleChoiceResponse(asChoiceConfig(c), r),
+    validateKey: (c, k) => validateSingleChoiceKey(asChoiceConfig(c), k),
+    score: (c, k, r) => scoreSingleChoice(asChoiceConfig(c), asSingleChoiceKey(k), asMatrixResponse(r)),
+  },
+  multi_select: {
+    validateConfig: validateMultiChoiceConfig,
+    validateResponse: (c, r) => validateMultiChoiceResponse(asChoiceConfig(c), r),
+    validateKey: (c, k) => validateMultiChoiceKey(asChoiceConfig(c), k),
+    score: (c, k, r) => scoreMultiChoice(asChoiceConfig(c), asMultiChoiceKey(k), asMatrixResponse(r)),
+  },
+  numeric_entry: {
+    validateConfig: validateNumericConfig,
+    validateResponse: (c, r) => validateStatementResponse(asStatementConfig(c), r),
+    validateKey: (c, k) => validateNumericKey(asStatementConfig(c), k),
+    score: (c, k, r) => scoreNumeric(asStatementConfig(c), asNumericKey(k), asMatrixResponse(r)),
   },
 }
 

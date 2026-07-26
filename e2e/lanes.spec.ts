@@ -71,7 +71,10 @@ test('quiz: sequential run through ordered items with a summary', async ({ page,
 
   await login(page)
   await page.goto('/#/practice/specific')
-  await page.getByRole('link', { name: /Mixed mini set/ }).click()
+  await page
+    .locator('.activity-card', { hasText: 'Mixed mini set' })
+    .getByRole('link', { name: 'Learn' })
+    .click()
 
   // Question 1 of 2 — the mini item comes first (position order).
   await expect(page.getByText('Question 1 of 2')).toBeVisible()

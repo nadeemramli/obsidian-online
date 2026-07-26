@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import {
   fetchItemsByIds,
@@ -11,12 +11,15 @@ import {
   type SubmitResult,
 } from '../../lib/practice/api'
 import { StageRun } from '../../components/practice/StageRun'
+import { ExamQuizRunner } from './ExamQuizRunner'
 
 // Sequential run through an authored quiz: one shared session, one attempt per
 // item through the standard engine, full feedback after each item (Learn
 // behavior), and a summary at the end.
 export default function QuizRunner() {
   const { quizId } = useParams()
+  const [search] = useSearchParams()
+  const examMode = search.get('mode') === 'exam'
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [items, setItems] = useState<LearningItem[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -101,6 +104,8 @@ export default function QuizRunner() {
         </Link>
       </div>
     )
+
+  if (examMode) return <ExamQuizRunner quiz={quiz} items={items} sessionId={sessionId} />
 
   if (done) {
     const pct = totals.max > 0 ? Math.round((totals.score / totals.max) * 100) : 0

@@ -64,9 +64,23 @@ maps PRD concepts to the as-built system and records scope decisions per ticket.
   retest supply. Property tests sweep 300 consecutive seeds through the full
   invariant gate; perfect-run scoring is verified against generated keys.
 
+## Phase 3 delivered: objective kinds + exam mechanics
+
+- Kinds `single_select`, `multi_select` (explicit `per_option` / `all_or_nothing`
+  marking policy; per-option feedback rows credit correctly-unticked distractors)
+  and `numeric_entry` (delegates to the statement scorer) — registered client-side,
+  in the edge dispatch (v5), and in the builder via one shared `ObjectiveEditor`.
+- Exam delivery mode on quizzes (`?mode=exam`): strict countdown (est_minutes, `?t=`
+  seconds override for tests), question palette with answered/flagged states, free
+  navigation, flag-for-review, zero feedback before submission, one submit for the
+  whole set (per-item idempotent submissions under the hood), confirm-on-unanswered,
+  auto-submit exactly once on expiry, deadline persisted so refresh resumes the run.
+- Seeded: 5 original OT questions + the timed "Section A sampler" quiz.
+- Learn mode remains the sequential immediate-feedback flow; cases stay Learn-mode
+  (exam MTQs arrive with full-mock assembly in Phase 4).
+
 ## Deliberate deferrals (per PRD phases 2–5)
 
-- Learn/Practice/Exam delivery modes, timers, flagging, auto-submit (Learn behavior only).
 - Confidence capture, mastery state machine, recommendations, analytics dashboards.
 - Skill taxonomy tables (skills live in spine config for the two authored cases).
 - Full mock assembly; families 2–6 content.
