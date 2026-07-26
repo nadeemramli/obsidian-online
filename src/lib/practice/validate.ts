@@ -11,6 +11,8 @@ import type {
   MatrixAnswerKey,
   MatrixConfig,
   MatrixResponse,
+  StatementAnswerKey,
+  StatementConfig,
 } from './scoring.ts'
 
 export type ValidationIssue = { path: string; message: string }
@@ -244,6 +246,116 @@ export function validateJournalResponse(config: JournalConfig, response: unknown
     }
   }
   return issues
+}
+
+// ---------------------------------------------------------------------------
+// statement_prep
+// ---------------------------------------------------------------------------
+
+export function validateStatementConfig(config: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(config)) return [{ path: 'config', message: 'must be an object' }]
+
+  checkIdLabelList(config.rows, 'rows', issues)
+  if (
+    !Array.isArray(config.columns) ||
+    config.columns.length !== 1 ||
+    !isRecord(config.columns[0]) ||
+    config.columns[0].id !== 'amount'
+  ) {
+    issues.push({
+      path: 'columns',
+      message: 'statement questions need exactly one column with id "amount"',
+    })
+  }
+  if ('options' in config && config.options !== undefined && !Array.isArray(config.options)) {
+    issues.push({ path: 'options', message: 'must be a list' })
+  }
+  for (const k of ['scenario_md', 'note_md'] as const) {
+    if (k in config && config[k] !== undefined && typeof config[k] !== 'string') {
+      issues.push({ path: k, message: 'must be a string' })
+    }
+  }
+  if (Array.isArray(config.rows)) {
+    config.rows.forEach((r: any, i: number) => {
+      if (isRecord(r) && 'style' in r && r.style !== undefined &&
+          !['line', 'subtotal', 'total'].includes(r.style as string)) {
+        issues.push({ path: `rows[${i}].style`, message: 'style must be line, subtotal or total' })
+      }
+    })
+  }
+  return issues
+}
+
+export function validateStatementKey(config: StatementConfig, key: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(key) || !isRecord(key.rows)) {
+    return [{ path: 'answer_key', message: 'must be an object with a "rows" map' }]
+  }
+  for (const row of config.rows) {
+    const keyRow = (key.rows as Record<string, unknown>)[row.id]
+    if (!isRecord(keyRow)) {
+      issues.push({ path: `answer_key.rows.${row.id}`, message: `missing answer for "${row.label}"` })
+      continue
+    }
+    if (typeof keyRow.amount !== 'number' || !isFinite(keyRow.amount)) {
+      issues.push({
+        path: `answer_key.rows.${row.id}.amount`,
+        message: `"${row.label}" has no correct amount`,
+      })
+    }
+    if (
+      'tolerance' in keyRow &&
+      keyRow.tolerance !== undefined &&
+      (typeof keyRow.tolerance !== 'number' || keyRow.tolerance < 0)
+    ) {
+      issues.push({
+        path: `answer_key.rows.${row.id}.tolerance`,
+        message: `"${row.label}" has an invalid tolerance`,
+      })
+    }
+    if (typeof keyRow.explanation_md !== 'string' || !keyRow.explanation_md.trim()) {
+      issues.push({
+        path: `answer_key.rows.${row.id}.explanation_md`,
+        message: `"${row.label}" has no explanation`,
+      })
+    }
+  }
+  return issues
+}
+
+export function validateStatementResponse(
+  config: StatementConfig,
+  response: unknown,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!isRecord(response)) return [{ path: 'answers', message: 'must be an object' }]
+  const rowIds = new Set(config.rows.map((r) => r.id))
+  for (const [rowId, cells] of Object.entries(response)) {
+    if (!rowIds.has(rowId)) {
+      issues.push({ path: `answers.${rowId}`, message: 'unknown row' })
+      continue
+    }
+    if (!isRecord(cells)) {
+      issues.push({ path: `answers.${rowId}`, message: 'must be an object' })
+      continue
+    }
+    for (const [colId, value] of Object.entries(cells)) {
+      if (colId !== 'amount') {
+        issues.push({ path: `answers.${rowId}.${colId}`, message: 'unknown column' })
+      } else if (value !== undefined && typeof value !== 'string') {
+        issues.push({ path: `answers.${rowId}.amount`, message: 'must be a string' })
+      }
+    }
+  }
+  return issues
+}
+
+export function asStatementConfig(v: unknown): StatementConfig {
+  return v as StatementConfig
+}
+export function asStatementKey(v: unknown): StatementAnswerKey {
+  return v as StatementAnswerKey
 }
 
 // Convenience for typed callers once validation passed.

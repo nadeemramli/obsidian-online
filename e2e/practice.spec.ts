@@ -21,7 +21,7 @@ async function fillAllCorrect(page: Page, except: Record<string, { debit?: strin
 }
 
 async function openActivity(page: Page) {
-  await page.goto('/#/practice')
+  await page.goto('/#/practice/specific')
   await page.getByRole('link', { name: /Activity 1: Dual effect/ }).click()
   await expect(page.getByRole('heading', { name: 'Activity 1: Dual effect' })).toBeVisible()
 }
@@ -38,12 +38,13 @@ test.beforeEach(async ({ mock }) => {
   ])
 })
 
-test('dashboard lists the activity with honest empty-state stats', async ({ page }) => {
+test('hub shows honest empty-state stats; lane 1 lists the activity', async ({ page }) => {
   await login(page)
   await page.goto('/#/practice')
-  await expect(page.getByRole('heading', { name: 'Practice' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Practice', exact: true })).toBeVisible()
   await expect(page.getByText('attempts so far')).toBeVisible()
   await expect(page.getByText('no attempts yet')).toBeVisible()
+  await page.goto('/#/practice/specific')
   await expect(page.getByRole('link', { name: /Activity 1: Dual effect/ })).toBeVisible()
   await expect(page.getByText('Not attempted')).toBeVisible()
 })
@@ -177,7 +178,7 @@ test('draft answers survive a page refresh', async ({ page }) => {
 test('mobile layout keeps every field usable', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await login(page)
-  await page.goto('/#/practice')
+  await page.goto('/#/practice/specific')
   await page.getByRole('link', { name: /Activity 1: Dual effect/ }).click()
 
   // All 16 selects exist and are operable in the card layout.

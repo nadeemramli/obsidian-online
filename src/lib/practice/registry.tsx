@@ -4,13 +4,18 @@
 import type { ComponentType } from 'react'
 import { MatrixRunner } from '../../components/practice/MatrixRunner'
 import { JournalRunner } from '../../components/practice/JournalRunner'
+import { StatementRunner } from '../../components/practice/StatementRunner'
 import {
   countAnswered,
   totalCells,
   type MatrixConfig,
   type MatrixResponse,
 } from './scoring.ts'
-import { validateJournalConfig, validateMatrixConfig } from './validate.ts'
+import {
+  validateJournalConfig,
+  validateMatrixConfig,
+  validateStatementConfig,
+} from './validate.ts'
 
 export type RunnerProps = {
   config: any
@@ -64,6 +69,14 @@ export const questionKinds: Record<string, KindDefinition> = {
     label: 'Journal entries (FS preparation)',
     Runner: JournalRunner,
     parseConfig: (raw) => (validateJournalConfig(raw).length === 0 ? raw : null),
+    countAnswered,
+    totalCells,
+    sanitize: (config, response) => sanitizeSelects(config, response, ['amount']),
+  },
+  statement_prep: {
+    label: 'Statement construction',
+    Runner: StatementRunner,
+    parseConfig: (raw) => (validateStatementConfig(raw).length === 0 ? raw : null),
     countAnswered,
     totalCells,
     sanitize: (config, response) => sanitizeSelects(config, response, ['amount']),

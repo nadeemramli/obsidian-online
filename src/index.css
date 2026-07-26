@@ -965,6 +965,93 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
 .jr-cell select, .jr-cell input { font-size: 13.5px; padding: 8px 10px; }
 .jr-amount input { font-variant-numeric: tabular-nums; text-align: right; }
 
+/* --- Two-lane hub --- */
+.lane-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.lane-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  color: var(--text);
+}
+.lane-card:hover { border-color: var(--accent); text-decoration: none; }
+.lane-card.statements:hover { border-color: var(--warn); }
+.lane-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.lane-card h2 { margin: 0; font-size: 19px; }
+.lane-card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.lane-meta { margin-top: 6px; font-size: 12.5px; color: var(--accent); }
+.lane-card.statements .lane-meta { color: var(--warn); }
+
+/* --- Statement proforma runner --- */
+.stmt { margin-top: 16px; max-width: 620px; }
+.stmt-head {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 10px;
+  padding: 0 12px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+.stmt-row {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+.stmt-row:hover { background: var(--bg-2); }
+.stmt-row.indented .stmt-label { padding-left: 18px; }
+.stmt-row.style-subtotal { border-top: 1px solid var(--border); }
+.stmt-row.style-subtotal .stmt-label, .stmt-row.style-subtotal input { font-weight: 600; }
+.stmt-row.style-total { border-top: 2px solid var(--muted); }
+.stmt-row.style-total .stmt-label, .stmt-row.style-total input { font-weight: 700; }
+.stmt-label { font-size: 14px; }
+.stmt-row input {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-size: 13.5px;
+  padding: 7px 10px;
+}
+
+/* --- Case workspace --- */
+.stage-nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px; }
+.stage-chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.stage-chip.current { border-color: var(--accent); color: var(--text); background: rgba(167, 139, 250, 0.1); }
+.stage-chip.done { color: var(--ok); border-color: rgba(74, 222, 128, 0.4); }
+.stage-title { margin: 0 0 4px; font-size: 16px; }
+
+.skill-list { display: flex; flex-direction: column; gap: 8px; }
+.skill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--err);
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 12px 14px;
+}
+.skill-row.ok { border-left-color: var(--ok); }
+.skill-main { display: flex; align-items: flex-start; gap: 10px; }
+.skill-main .verdict-chip { margin-top: 2px; }
+.skill-note { font-size: 12.5px; margin-top: 2px; }
+
 /* --- Small screens: matrix becomes cards; builder stacks --- */
 @media (max-width: 860px) {
   .builder-split { grid-template-columns: 1fr; }
@@ -982,4 +1069,8 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
   .practice-actions { flex-direction: column; align-items: stretch; }
   .practice-actions-right { justify-content: space-between; }
   .error-item { flex-direction: column; }
+  .lane-cards { grid-template-columns: 1fr; }
+  .stmt-head { grid-template-columns: 1fr 110px; }
+  .stmt-row { grid-template-columns: 1fr 110px; }
+  .skill-row { flex-direction: column; align-items: stretch; }
 }

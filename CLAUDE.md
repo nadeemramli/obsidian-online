@@ -21,7 +21,10 @@
 - `supabase/functions/vault-mcp/` is an MCP server (Edge Function) for Claude access;
   auth = anon-key JWT + `x-vault-token` checked against RLS-locked `public.mcp_tokens`.
   Redeploy via the Supabase MCP `deploy_edge_function` tool after editing.
-- ACCA learning system (PRD: `docs/PRD.md`): content tables (`learning_items`,
+- FFA Integrated Practice Engine: product spec in `docs/PRD-FFA-INTEGRATED.md`
+  (two lanes, spines, diagnosis); reconciliation + scope record in
+  `docs/IMPLEMENTATION-NOTES.md`. Platform baseline below.
+- ACCA learning system (platform baseline: `docs/PRD.md`): content tables (`learning_items`,
   `learning_item_answers`, `quizzes`, `quiz_items`) are editor-owned; learner state
   (`profiles`, `practice_sessions`, `attempts`, `error_log`, `review_states`) is
   RLS-owned per user. Answer keys are never readable by learners — evaluation happens

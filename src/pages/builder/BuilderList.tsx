@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   createDraftItem,
+  createQuiz,
   fetchAllItems,
+  fetchAllQuizzes,
   fetchItemAnswers,
   updateItem,
   upsertItemAnswers,
   type LearningItem,
+  type Quiz,
 } from '../../lib/practice/api'
 import type { Json } from '../../lib/database.types'
 
@@ -29,8 +32,15 @@ const DEFAULT_JOURNAL_CONFIG = {
   options: [],
 } as unknown as Json
 
+const DEFAULT_STATEMENT_CONFIG = {
+  columns: [{ id: 'amount', label: 'Amount ($)' }],
+  rows: [],
+  options: [],
+} as unknown as Json
+
 export default function BuilderList() {
   const [items, setItems] = useState<LearningItem[]>([])
+  const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -38,7 +48,9 @@ export default function BuilderList() {
 
   async function reload() {
     try {
-      setItems(await fetchAllItems())
+      const [i, q] = await Promise.all([fetchAllItems(), fetchAllQuizzes()])
+      setItems(i)
+      setQuizzes(q)
       setError(null)
     } catch (e: any) {
       setError(e.message || 'Failed to load content')
@@ -51,17 +63,34 @@ export default function BuilderList() {
     void reload()
   }, [])
 
-  async function newQuestion(kind: 'matrix_select' | 'journal_entry') {
+  async function newQuestion(kind: 'matrix_select' | 'journal_entry' | 'statement_prep') {
     setBusy(true)
     try {
-      const item = await createDraftItem({
-        kind,
-        title: kind === 'journal_entry' ? 'Untitled journal question' : 'Untitled matrix question',
-        config: kind === 'journal_entry' ? DEFAULT_JOURNAL_CONFIG : DEFAULT_MATRIX_CONFIG,
-      })
+      const titles = {
+        matrix_select: 'Untitled matrix question',
+        journal_entry: 'Untitled journal question',
+        statement_prep: 'Untitled statement question',
+      }
+      const configs = {
+        matrix_select: DEFAULT_MATRIX_CONFIG,
+        journal_entry: DEFAULT_JOURNAL_CONFIG,
+        statement_prep: DEFAULT_STATEMENT_CONFIG,
+      }
+      const item = await createDraftItem({ kind, title: titles[kind], config: configs[kind] })
       navigate(`/builder/item/${item.id}`)
     } catch (e: any) {
       setError(e.message || 'Could not create the question')
+      setBusy(false)
+    }
+  }
+
+  async function newQuiz() {
+    setBusy(true)
+    try {
+      const quiz = await createQuiz('Untitled quiz')
+      navigate(`/builder/quiz/${quiz.id}`)
+    } catch (e: any) {
+      setError(e.message || 'Could not create the quiz')
       setBusy(false)
     }
   }
@@ -126,14 +155,50 @@ export default function BuilderList() {
         <h1>Question builder</h1>
         <div className="head-actions">
           <button className="btn primary" onClick={() => newQuestion('matrix_select')} disabled={busy}>
-            + New matrix question
+            + Matrix
           </button>
           <button className="btn primary" onClick={() => newQuestion('journal_entry')} disabled={busy}>
-            + New journal question
+            + Journal
+          </button>
+          <button className="btn primary" onClick={() => newQuestion('statement_prep')} disabled={busy}>
+            + Statement
+          </button>
+          <button className="btn" onClick={newQuiz} disabled={busy}>
+            + Quiz
           </button>
         </div>
       </div>
       {error && <p className="msg error">{error}</p>}
+
+      <section>
+        <h3 className="section-h">
+          Quizzes <span className="muted">({quizzes.length})</span>
+        </h3>
+        {quizzes.length === 0 ? (
+          <p className="muted">None yet.</p>
+        ) : (
+          <div className="activity-list">
+            {quizzes.map((q) => (
+              <div key={q.id} className="activity-card static">
+                <div className="activity-main">
+                  <Link to={`/builder/quiz/${q.id}`}>
+                    <strong>{q.title}</strong>
+                  </Link>
+                  <span className="muted activity-sub">
+                    {[q.status, q.paper, q.topic].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+                <span className="activity-side builder-actions">
+                  <Link className="btn" to={`/builder/quiz/${q.id}`}>
+                    Edit
+                  </Link>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {groups.map(([label, group]) => (
         <section key={label}>
           <h3 className="section-h">

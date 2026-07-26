@@ -43,7 +43,7 @@ export type RowFeedback = {
 }
 
 export type MatrixFeedback = {
-  kind: 'matrix_select' | 'journal_entry'
+  kind: 'matrix_select' | 'journal_entry' | 'statement_prep'
   // Self-contained snapshot: column and option labels are embedded at scoring
   // time so a stored attempt stays readable even after the question is edited.
   columns: MatrixColumn[]
@@ -199,6 +199,83 @@ export function scoreJournal(
 
   return {
     kind: 'journal_entry',
+    columns: config.columns.map((c) => ({ id: c.id, label: c.label })),
+    option_labels: optionLabels,
+    rows,
+    cell_score: cellScore,
+    cell_max: cellMax,
+    tx_correct: txCorrect,
+    tx_total: config.rows.length,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// statement_prep — construct a financial statement or extract line by line.
+// One numeric cell per row; rows carry display metadata (indent, style) so the
+// runner can render a proforma. Emits the same self-contained snapshot.
+// ---------------------------------------------------------------------------
+
+export type StatementRow = {
+  id: string
+  label: string
+  indent?: number // 0 or 1 — visual nesting in the proforma
+  style?: 'line' | 'subtotal' | 'total'
+}
+
+export type StatementConfig = {
+  scenario_md?: string
+  note_md?: string
+  columns: MatrixColumn[] // exactly one column with id "amount"
+  rows: StatementRow[]
+  options: MatrixOption[] // unused for this kind; kept for shape compatibility
+}
+
+export type StatementKeyRow = {
+  amount: number
+  tolerance?: number
+  explanation_md: string
+}
+export type StatementAnswerKey = { rows: Record<string, StatementKeyRow> }
+
+export function scoreStatement(
+  config: StatementConfig,
+  key: StatementAnswerKey,
+  response: MatrixResponse,
+): MatrixFeedback {
+  const rows: RowFeedback[] = []
+  let cellScore = 0
+  let cellMax = 0
+  let txCorrect = 0
+
+  for (const row of config.rows) {
+    const keyRow = key.rows[row.id]
+    if (!keyRow || typeof keyRow.amount !== 'number') {
+      throw new Error(`answer key missing row "${row.id}"`)
+    }
+    const raw = response?.[row.id]?.amount
+    const selected = typeof raw === 'string' && raw.trim() ? raw.trim() : null
+    const parsed = parseAmount(selected)
+    const tolerance = typeof keyRow.tolerance === 'number' ? keyRow.tolerance : 0
+    const ok = parsed !== null && Math.abs(parsed - keyRow.amount) <= tolerance
+    cellMax += 1
+    if (ok) {
+      cellScore += 1
+      txCorrect += 1
+    }
+    rows.push({
+      row_id: row.id,
+      row_label: row.label,
+      cells: [{ column_id: 'amount', selected, correct: String(keyRow.amount), ok }],
+      row_correct: ok,
+      explanation_md: typeof keyRow.explanation_md === 'string' ? keyRow.explanation_md : '',
+    })
+  }
+
+  const optionLabels: Record<string, string> = {}
+  for (const o of config.options) optionLabels[o.id] = o.label
+
+  return {
+    kind: 'statement_prep',
     columns: config.columns.map((c) => ({ id: c.id, label: c.label })),
     option_labels: optionLabels,
     rows,

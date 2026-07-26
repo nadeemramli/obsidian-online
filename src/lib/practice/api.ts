@@ -11,6 +11,10 @@ export type PracticeSession = Tables<'practice_sessions'>
 export type ErrorLogEntry = Tables<'error_log'>
 export type Profile = Tables<'profiles'>
 export type ItemAnswers = Tables<'learning_item_answers'>
+export type Quiz = Tables<'quizzes'>
+export type QuizItem = Tables<'quiz_items'>
+export type PracticeSpine = Tables<'practice_spines'>
+export type SpineStage = Tables<'spine_stages'>
 
 // ---------- learner: content ----------
 
@@ -20,6 +24,13 @@ export async function fetchPublishedItems(): Promise<LearningItem[]> {
     .select('*')
     .eq('status', 'published')
     .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchItemsByIds(ids: string[]): Promise<LearningItem[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await supabase.from('learning_items').select('*').in('id', ids)
   if (error) throw error
   return data || []
 }
@@ -34,12 +45,78 @@ export async function fetchItem(id: string): Promise<LearningItem | null> {
   return data
 }
 
+// ---------- learner: quizzes & spines ----------
+
+export async function fetchPublishedQuizzes(): Promise<Quiz[]> {
+  const { data, error } = await supabase
+    .from('quizzes')
+    .select('*')
+    .eq('status', 'published')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchQuiz(id: string): Promise<Quiz | null> {
+  const { data, error } = await supabase.from('quizzes').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function fetchQuizItems(quizId: string): Promise<QuizItem[]> {
+  const { data, error } = await supabase
+    .from('quiz_items')
+    .select('*')
+    .eq('quiz_id', quizId)
+    .order('position', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchPublishedSpines(): Promise<PracticeSpine[]> {
+  const { data, error } = await supabase
+    .from('practice_spines')
+    .select('*')
+    .eq('status', 'published')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchSpine(id: string): Promise<PracticeSpine | null> {
+  const { data, error } = await supabase
+    .from('practice_spines')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function fetchSpineStages(spineId: string): Promise<SpineStage[]> {
+  const { data, error } = await supabase
+    .from('spine_stages')
+    .select('*')
+    .eq('spine_id', spineId)
+    .order('position', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
 // ---------- learner: sessions & attempts ----------
 
-export async function startSession(itemId: string): Promise<PracticeSession> {
+export async function startSession(
+  itemId: string,
+  opts?: { lane?: 'specific' | 'statements'; quizId?: string; spineId?: string },
+): Promise<PracticeSession> {
   const { data, error } = await supabase
     .from('practice_sessions')
-    .insert({ item_id: itemId })
+    .insert({
+      item_id: itemId,
+      lane: opts?.lane ?? 'specific',
+      quiz_id: opts?.quizId ?? null,
+      spine_id: opts?.spineId ?? null,
+    })
     .select()
     .single()
   if (error) throw error
@@ -219,6 +296,54 @@ export async function upsertItemAnswers(input: {
 
 export async function deleteItem(id: string): Promise<void> {
   const { error } = await supabase.from('learning_items').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---------- editor: quizzes ----------
+
+export async function fetchAllQuizzes(): Promise<Quiz[]> {
+  const { data, error } = await supabase
+    .from('quizzes')
+    .select('*')
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function createQuiz(title: string): Promise<Quiz> {
+  const { data: userData } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('quizzes')
+    .insert({ title, status: 'draft', created_by: userData.user?.id })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateQuiz(
+  id: string,
+  patch: Partial<Pick<Quiz, 'title' | 'description_md' | 'paper' | 'topic' | 'difficulty' | 'status' | 'est_minutes'>>,
+): Promise<Quiz> {
+  const { data, error } = await supabase.from('quizzes').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteQuiz(id: string): Promise<void> {
+  const { error } = await supabase.from('quizzes').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Replace a quiz's ordered membership atomically enough for a single editor:
+// delete then insert (positions are 0..n-1; the unique constraint is deferred).
+export async function setQuizItems(quizId: string, itemIds: string[]): Promise<void> {
+  const { error: delError } = await supabase.from('quiz_items').delete().eq('quiz_id', quizId)
+  if (delError) throw delError
+  if (itemIds.length === 0) return
+  const { error } = await supabase
+    .from('quiz_items')
+    .insert(itemIds.map((item_id, position) => ({ quiz_id: quizId, item_id, position })))
   if (error) throw error
 }
 

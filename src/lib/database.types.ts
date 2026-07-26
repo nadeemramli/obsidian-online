@@ -290,7 +290,9 @@ export type Database = {
           completed_at: string | null
           id: string
           item_id: string | null
+          lane: string
           quiz_id: string | null
+          spine_id: string | null
           started_at: string
           status: string
           user_id: string
@@ -299,7 +301,9 @@ export type Database = {
           completed_at?: string | null
           id?: string
           item_id?: string | null
+          lane?: string
           quiz_id?: string | null
+          spine_id?: string | null
           started_at?: string
           status?: string
           user_id?: string
@@ -308,7 +312,9 @@ export type Database = {
           completed_at?: string | null
           id?: string
           item_id?: string | null
+          lane?: string
           quiz_id?: string | null
+          spine_id?: string | null
           started_at?: string
           status?: string
           user_id?: string
@@ -328,7 +334,56 @@ export type Database = {
             referencedRelation: "quizzes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "practice_sessions_spine_id_fkey"
+            columns: ["spine_id"]
+            isOneToOne: false
+            referencedRelation: "practice_spines"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      practice_spines: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          description_md: string
+          family: string
+          id: string
+          paper: string | null
+          status: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description_md?: string
+          family: string
+          id?: string
+          paper?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description_md?: string
+          family?: string
+          id?: string
+          paper?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -469,6 +524,42 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "learning_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spine_stages: {
+        Row: {
+          item_id: string
+          position: number
+          spine_id: string
+          title: string
+        }
+        Insert: {
+          item_id: string
+          position: number
+          spine_id: string
+          title?: string
+        }
+        Update: {
+          item_id?: string
+          position?: number
+          spine_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spine_stages_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "learning_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spine_stages_spine_id_fkey"
+            columns: ["spine_id"]
+            isOneToOne: false
+            referencedRelation: "practice_spines"
             referencedColumns: ["id"]
           },
         ]

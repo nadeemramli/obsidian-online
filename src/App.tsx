@@ -14,12 +14,17 @@ import NewNote from './pages/NewNote'
 import Settings from './pages/Settings'
 import Graph from './pages/Graph'
 import PracticeHome from './pages/practice/PracticeHome'
+import SpecificPractice from './pages/practice/SpecificPractice'
+import StatementPractice from './pages/practice/StatementPractice'
 import PracticeRun from './pages/practice/PracticeRun'
+import QuizRunner from './pages/practice/QuizRunner'
+import CaseRunner from './pages/practice/CaseRunner'
 import AttemptView from './pages/practice/AttemptView'
 import PracticeHistory from './pages/practice/PracticeHistory'
 import ErrorLogPage from './pages/practice/ErrorLogPage'
 import BuilderList from './pages/builder/BuilderList'
 import BuilderItem from './pages/builder/BuilderItem'
+import QuizEditor from './pages/builder/QuizEditor'
 
 export default function App() {
   return (
@@ -44,6 +49,10 @@ export default function App() {
                 <Route path="/note/:slug/edit" element={<NoteEdit />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/practice" element={<PracticeHome />} />
+                <Route path="/practice/specific" element={<SpecificPractice />} />
+                <Route path="/practice/statements" element={<StatementPractice />} />
+                <Route path="/practice/quiz/:quizId" element={<QuizRunner />} />
+                <Route path="/practice/case/:spineId" element={<CaseRunner />} />
                 <Route path="/practice/run/:itemId" element={<PracticeRun />} />
                 <Route path="/practice/attempt/:attemptId" element={<AttemptView />} />
                 <Route path="/practice/history" element={<PracticeHistory />} />
@@ -61,6 +70,14 @@ export default function App() {
                   element={
                     <RoleRoute>
                       <BuilderItem />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="/builder/quiz/:quizId"
+                  element={
+                    <RoleRoute>
+                      <QuizEditor />
                     </RoleRoute>
                   }
                 />

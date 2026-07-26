@@ -5,16 +5,21 @@ import {
   fetchAttempts,
   fetchErrors,
   fetchPublishedItems,
+  fetchPublishedSpines,
   loadLocalDraft,
   type Attempt,
   type ErrorLogEntry,
   type LearningItem,
+  type PracticeSpine,
 } from '../../lib/practice/api'
 
+// Two-lane practice hub (PRD §8): Specific Practice for coverage and repair,
+// Financial Statement Practice for integration. Both lanes run on one engine.
 export default function PracticeHome() {
   const { session } = useAuth()
   const userId = session?.user?.id ?? 'anon'
   const [items, setItems] = useState<LearningItem[]>([])
+  const [spines, setSpines] = useState<PracticeSpine[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [errors, setErrors] = useState<ErrorLogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,10 +27,16 @@ export default function PracticeHome() {
 
   useEffect(() => {
     let active = true
-    Promise.all([fetchPublishedItems(), fetchAttempts(50), fetchErrors(true)])
-      .then(([i, a, e]) => {
+    Promise.all([
+      fetchPublishedItems(),
+      fetchPublishedSpines(),
+      fetchAttempts(50),
+      fetchErrors(true),
+    ])
+      .then(([i, s, a, e]) => {
         if (!active) return
         setItems(i)
+        setSpines(s)
         setAttempts(a)
         setErrors(e)
       })
@@ -51,25 +62,10 @@ export default function PracticeHome() {
     }
   }, [attempts])
 
-  // Open errors grouped by topic — the honest early version of "concepts
-  // requiring attention".
-  const weakTopics = useMemo(() => {
-    const byTopic = new Map<string, number>()
-    for (const e of errors) {
-      const key = e.topic || e.paper || 'General'
-      byTopic.set(key, (byTopic.get(key) || 0) + 1)
-    }
-    return Array.from(byTopic.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-  }, [errors])
-
   const continueItem = useMemo(
     () => items.find((it) => loadLocalDraft(it.id, userId)),
     [items, userId],
   )
-
-  const itemTitle = (id: string) => items.find((i) => i.id === id)?.title ?? 'Activity'
 
   if (loading) return <div className="page muted">Loading…</div>
   if (error)
@@ -94,6 +90,44 @@ export default function PracticeHome() {
         </div>
       </div>
 
+      {continueItem && (
+        <div className="continue-card">
+          <div>
+            <strong>Pick up where you left off</strong>
+            <div className="muted">{continueItem.title} — you have unsubmitted answers.</div>
+          </div>
+          <Link className="btn primary" to={`/practice/run/${continueItem.id}`}>
+            Continue
+          </Link>
+        </div>
+      )}
+
+      <div className="lane-cards">
+        <Link to="/practice/specific" className="lane-card">
+          <span className="lane-kicker">Lane 1</span>
+          <h2>Specific Practice</h2>
+          <p>
+            Short, targeted drills and quizzes: classification, double entry, adjustments,
+            errors, cost behaviour. Coverage and repair.
+          </p>
+          <span className="lane-meta">
+            {items.length} activities
+            {errors.length > 0 ? ` · ${errors.length} open error${errors.length === 1 ? '' : 's'} to repair` : ''}
+          </span>
+        </Link>
+        <Link to="/practice/statements" className="lane-card statements">
+          <span className="lane-kicker">Lane 2</span>
+          <h2>Financial Statement Practice</h2>
+          <p>
+            Integrated cases: from a trial balance and adjustments to complete financial
+            statements, with diagnosis, repair and an altered retest.
+          </p>
+          <span className="lane-meta">
+            {spines.length} case{spines.length === 1 ? '' : 's'} available
+          </span>
+        </Link>
+      </div>
+
       <div className="stat-row">
         <div className="stat-card">
           <span className="stat-num">{stats.total}</span>
@@ -114,73 +148,6 @@ export default function PracticeHome() {
       </div>
       {stats.total > 0 && stats.total < 5 && (
         <p className="hint">Early numbers — they'll mean more after a few more attempts.</p>
-      )}
-
-      {continueItem && (
-        <div className="continue-card">
-          <div>
-            <strong>Pick up where you left off</strong>
-            <div className="muted">{continueItem.title} — you have unsubmitted answers.</div>
-          </div>
-          <Link className="btn primary" to={`/practice/run/${continueItem.id}`}>
-            Continue
-          </Link>
-        </div>
-      )}
-
-      {weakTopics.length > 0 && (
-        <>
-          <h3 className="section-h">Needs attention</h3>
-          <div className="weak-topics">
-            {weakTopics.map(([topic, n]) => (
-              <Link key={topic} to="/practice/errors" className="weak-topic">
-                {topic} <span className="muted">· {n} open error{n === 1 ? '' : 's'}</span>
-              </Link>
-            ))}
-          </div>
-        </>
-      )}
-
-      <h3 className="section-h">Activities</h3>
-      {items.length === 0 ? (
-        <p className="muted">No published activities yet.</p>
-      ) : (
-        <div className="activity-list">
-          {items.map((it) => {
-            const last = attempts.find((a) => a.item_id === it.id)
-            return (
-              <Link key={it.id} to={`/practice/run/${it.id}`} className="activity-card">
-                <div className="activity-main">
-                  <strong>{it.title}</strong>
-                  <span className="muted activity-sub">
-                    {[it.paper, it.topic, it.difficulty].filter(Boolean).join(' · ')}
-                  </span>
-                </div>
-                <span className="activity-side">
-                  {last
-                    ? `Last: ${last.cell_score}/${last.cell_max}`
-                    : 'Not attempted'}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-      )}
-
-      {attempts.length > 0 && (
-        <>
-          <h3 className="section-h">Recent practice</h3>
-          <ul className="recent-list">
-            {attempts.slice(0, 5).map((a) => (
-              <li key={a.id}>
-                <Link to={`/practice/attempt/${a.id}`}>
-                  {itemTitle(a.item_id)} — {a.cell_score}/{a.cell_max}
-                </Link>{' '}
-                <span className="muted">{new Date(a.created_at).toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        </>
       )}
     </div>
   )

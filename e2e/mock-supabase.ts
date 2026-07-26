@@ -3,10 +3,13 @@ import { SUPABASE_URL } from '../src/lib/config'
 import {
   scoreMatrix,
   scoreJournal,
+  scoreStatement,
   type MatrixConfig,
   type MatrixAnswerKey,
   type JournalConfig,
   type JournalAnswerKey,
+  type StatementConfig,
+  type StatementAnswerKey,
 } from '../src/lib/practice/scoring.ts'
 import {
   DUAL_EFFECT_ITEM,
@@ -14,6 +17,7 @@ import {
   DUAL_EFFECT_OVERALL,
 } from './practice-fixture'
 import { MUGG_ITEM, MUGG_KEY, MUGG_OVERALL } from './journal-fixture'
+import { fernleafMockData } from './fernleaf-fixture'
 
 export const TEST_EMAIL = 'reader@vault.test'
 export const TEST_PASSWORD = 'test-password-123'
@@ -104,6 +108,10 @@ export class MockSupabase {
   sessions: Array<Record<string, any>> = []
   attempts: MockAttempt[] = []
   errors: Array<Record<string, any>> = []
+  quizzes: Array<Record<string, any>> = []
+  quizItems: Array<Record<string, any>> = []
+  spines: Array<Record<string, any>> = []
+  spineStages: Array<Record<string, any>> = []
   private seq = 0
 
   seed(items: Array<{ title: string; slug: string; content: string; folder?: string }>) {
@@ -123,6 +131,15 @@ export class MockSupabase {
       answer_key: DUAL_EFFECT_KEY,
       overall_explanation_md: DUAL_EFFECT_OVERALL,
     })
+  }
+
+  // Seed the Fernleaf sole-trader case (spine A + retest spine B stub).
+  seedFernleaf() {
+    const data = fernleafMockData()
+    this.items.push(...(JSON.parse(JSON.stringify(data.items)) as MockItem[]))
+    this.answers.push(...(JSON.parse(JSON.stringify(data.answers)) as any[]))
+    this.spines.push(...JSON.parse(JSON.stringify(data.spines)))
+    this.spineStages.push(...JSON.parse(JSON.stringify(data.stages)))
   }
 
   // Seed the Mugg journal_entry activity (Activity 8).
@@ -335,6 +352,101 @@ export class MockSupabase {
       }
     }
 
+    // ---- PostgREST: quizzes ----
+    if (path === '/rest/v1/quizzes') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      const idFilter = param(url, 'id')
+      const statusFilter = param(url, 'status')
+      if (method === 'GET') {
+        let rows = this.quizzes.slice()
+        if (!this.isEditor) rows = rows.filter((q) => q.status === 'published')
+        if (idFilter) rows = rows.filter((q) => q.id === idFilter)
+        if (statusFilter) rows = rows.filter((q) => q.status === statusFilter)
+        return this.reply(route, applyOrder(rows, url), wantsObject)
+      }
+      if (method === 'POST') {
+        if (!this.isEditor) return json(route, { message: 'permission denied', code: '42501' }, 403)
+        const body = req.postDataJSON() as Record<string, any>
+        this.seq += 1
+        const quiz = {
+          id: `quiz-${this.seq}`,
+          title: '',
+          description_md: '',
+          paper: null,
+          syllabus_area: null,
+          topic: null,
+          tags: [],
+          difficulty: null,
+          est_minutes: null,
+          timed: false,
+          status: 'draft',
+          created_by: TEST_USER_ID,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          ...body,
+        }
+        this.quizzes.push(quiz)
+        return this.reply(route, [quiz], wantsObject, 201)
+      }
+      if (method === 'PATCH') {
+        if (!this.isEditor) return json(route, { message: 'permission denied', code: '42501' }, 403)
+        const body = req.postDataJSON() as Record<string, any>
+        const rows = this.quizzes.filter((q) => q.id === idFilter)
+        for (const q of rows) Object.assign(q, body, { updated_at: new Date().toISOString() })
+        return this.reply(route, rows, wantsObject)
+      }
+      if (method === 'DELETE') {
+        this.quizzes = this.quizzes.filter((q) => q.id !== idFilter)
+        return route.fulfill({ status: 204, headers: CORS })
+      }
+    }
+
+    // ---- PostgREST: quiz_items ----
+    if (path === '/rest/v1/quiz_items') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      const quizFilter = param(url, 'quiz_id')
+      if (method === 'GET') {
+        let rows = this.quizItems.slice()
+        if (quizFilter) rows = rows.filter((m) => m.quiz_id === quizFilter)
+        rows.sort((a, b) => a.position - b.position)
+        return this.reply(route, rows, wantsObject)
+      }
+      if (method === 'POST') {
+        const body = req.postDataJSON()
+        const list = Array.isArray(body) ? body : [body]
+        this.quizItems.push(...list)
+        return this.reply(route, list, wantsObject, 201)
+      }
+      if (method === 'DELETE') {
+        this.quizItems = this.quizItems.filter((m) => m.quiz_id !== quizFilter)
+        return route.fulfill({ status: 204, headers: CORS })
+      }
+    }
+
+    // ---- PostgREST: practice_spines / spine_stages ----
+    if (path === '/rest/v1/practice_spines') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      const idFilter = param(url, 'id')
+      const statusFilter = param(url, 'status')
+      if (method === 'GET') {
+        let rows = this.spines.slice()
+        if (!this.isEditor) rows = rows.filter((s) => s.status === 'published')
+        if (idFilter) rows = rows.filter((s) => s.id === idFilter)
+        if (statusFilter) rows = rows.filter((s) => s.status === statusFilter)
+        return this.reply(route, applyOrder(rows, url), wantsObject)
+      }
+    }
+    if (path === '/rest/v1/spine_stages') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      const spineFilter = param(url, 'spine_id')
+      if (method === 'GET') {
+        let rows = this.spineStages.slice()
+        if (spineFilter) rows = rows.filter((s) => s.spine_id === spineFilter)
+        rows.sort((a, b) => a.position - b.position)
+        return this.reply(route, rows, wantsObject)
+      }
+    }
+
     // ---- PostgREST: practice_sessions ----
     if (path === '/rest/v1/practice_sessions') {
       const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
@@ -345,7 +457,9 @@ export class MockSupabase {
           id: `00000000-0000-4000-9000-${String(this.seq).padStart(12, '0')}`,
           user_id: TEST_USER_ID,
           item_id: body.item_id ?? null,
-          quiz_id: null,
+          quiz_id: body.quiz_id ?? null,
+          spine_id: body.spine_id ?? null,
+          lane: body.lane ?? 'specific',
           status: 'in_progress',
           started_at: new Date().toISOString(),
           completed_at: null,
@@ -423,14 +537,21 @@ export class MockSupabase {
       if (!item) return json(route, { error: 'Activity not found' }, 404)
       const key = this.answers.find((a) => a.item_id === item.id && a.version === item.version)
       if (!key) return json(route, { error: 'This activity has no answer key yet' }, 500)
+      const kind = (item as any).kind
       const feedback =
-        (item as any).kind === 'journal_entry'
+        kind === 'journal_entry'
           ? scoreJournal(
               item.config as unknown as JournalConfig,
               key.answer_key as unknown as JournalAnswerKey,
               body.answers ?? {},
             )
-          : scoreMatrix(item.config as MatrixConfig, key.answer_key, body.answers ?? {})
+          : kind === 'statement_prep'
+            ? scoreStatement(
+                item.config as unknown as StatementConfig,
+                key.answer_key as unknown as StatementAnswerKey,
+                body.answers ?? {},
+              )
+            : scoreMatrix(item.config as MatrixConfig, key.answer_key, body.answers ?? {})
       const storedFeedback = {
         ...feedback,
         overall_explanation_md: key.overall_explanation_md,

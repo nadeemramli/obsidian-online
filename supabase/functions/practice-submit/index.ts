@@ -17,7 +17,7 @@
 // scoring.ts / validate.ts here are byte-for-byte copies of
 // src/lib/practice/*.ts — the unit suite fails if they drift.
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { scoreMatrix, scoreJournal, type MatrixFeedback } from './scoring.ts'
+import { scoreMatrix, scoreJournal, scoreStatement, type MatrixFeedback } from './scoring.ts'
 import {
   validateMatrixConfig,
   validateMatrixKey,
@@ -25,12 +25,48 @@ import {
   validateJournalConfig,
   validateJournalKey,
   validateJournalResponse,
+  validateStatementConfig,
+  validateStatementKey,
+  validateStatementResponse,
   asMatrixConfig,
   asMatrixKey,
   asMatrixResponse,
   asJournalConfig,
   asJournalKey,
+  asStatementConfig,
+  asStatementKey,
 } from './validate.ts'
+
+// Per-kind validation + scoring dispatch. Registering a kind here mirrors the
+// client registry (src/lib/practice/registry.tsx).
+const KINDS: Record<
+  string,
+  {
+    validateConfig: (c: unknown) => { path: string; message: string }[]
+    validateResponse: (c: any, r: unknown) => { path: string; message: string }[]
+    validateKey: (c: any, k: unknown) => { path: string; message: string }[]
+    score: (c: any, k: any, r: any) => MatrixFeedback
+  }
+> = {
+  matrix_select: {
+    validateConfig: validateMatrixConfig,
+    validateResponse: (c, r) => validateMatrixResponse(asMatrixConfig(c), r),
+    validateKey: (c, k) => validateMatrixKey(asMatrixConfig(c), k),
+    score: (c, k, r) => scoreMatrix(asMatrixConfig(c), asMatrixKey(k), asMatrixResponse(r)),
+  },
+  journal_entry: {
+    validateConfig: validateJournalConfig,
+    validateResponse: (c, r) => validateJournalResponse(asJournalConfig(c), r),
+    validateKey: (c, k) => validateJournalKey(asJournalConfig(c), k),
+    score: (c, k, r) => scoreJournal(asJournalConfig(c), asJournalKey(k), asMatrixResponse(r)),
+  },
+  statement_prep: {
+    validateConfig: validateStatementConfig,
+    validateResponse: (c, r) => validateStatementResponse(asStatementConfig(c), r),
+    validateKey: (c, k) => validateStatementKey(asStatementConfig(c), k),
+    score: (c, k, r) => scoreStatement(asStatementConfig(c), asStatementKey(k), asMatrixResponse(r)),
+  },
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -127,19 +163,13 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (itemError) return json({ error: itemError.message }, 500)
   if (!item) return json({ error: 'Activity not found' }, 404)
-  if (item.kind !== 'matrix_select' && item.kind !== 'journal_entry')
-    return json({ error: `Unsupported question kind "${item.kind}"` }, 400)
+  const kindDef = KINDS[item.kind]
+  if (!kindDef) return json({ error: `Unsupported question kind "${item.kind}"` }, 400)
 
-  const configIssues =
-    item.kind === 'journal_entry'
-      ? validateJournalConfig(item.config)
-      : validateMatrixConfig(item.config)
+  const configIssues = kindDef.validateConfig(item.config)
   if (configIssues.length > 0) return json({ error: 'Question configuration is invalid' }, 500)
 
-  const responseIssues =
-    item.kind === 'journal_entry'
-      ? validateJournalResponse(asJournalConfig(item.config), answers)
-      : validateMatrixResponse(asMatrixConfig(item.config), answers)
+  const responseIssues = kindDef.validateResponse(item.config, answers)
   if (responseIssues.length > 0)
     return json({ error: 'Malformed submission', details: responseIssues }, 400)
 
@@ -155,24 +185,10 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (keyError) return json({ error: keyError.message }, 500)
   if (!keyRow) return json({ error: 'This activity has no answer key yet' }, 500)
-  const keyIssues =
-    item.kind === 'journal_entry'
-      ? validateJournalKey(asJournalConfig(item.config), keyRow.answer_key)
-      : validateMatrixKey(asMatrixConfig(item.config), keyRow.answer_key)
+  const keyIssues = kindDef.validateKey(item.config, keyRow.answer_key)
   if (keyIssues.length > 0) return json({ error: 'Answer key is incomplete' }, 500)
 
-  const feedback: MatrixFeedback =
-    item.kind === 'journal_entry'
-      ? scoreJournal(
-          asJournalConfig(item.config),
-          asJournalKey(keyRow.answer_key),
-          asMatrixResponse(answers),
-        )
-      : scoreMatrix(
-          asMatrixConfig(item.config),
-          asMatrixKey(keyRow.answer_key),
-          asMatrixResponse(answers),
-        )
+  const feedback: MatrixFeedback = kindDef.score(item.config, keyRow.answer_key, answers)
   const storedFeedback = {
     ...feedback,
     overall_explanation_md: keyRow.overall_explanation_md ?? null,
