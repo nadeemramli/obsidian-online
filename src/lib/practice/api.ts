@@ -221,6 +221,19 @@ export async function fetchGeneratedCase(id: string): Promise<GeneratedCaseRow |
   return data
 }
 
+// ---------- learner: review states ----------
+
+export type ReviewState = Tables<'review_states'>
+
+export async function fetchReviewStates(): Promise<ReviewState[]> {
+  const { data, error } = await supabase
+    .from('review_states')
+    .select('*')
+    .order('due_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
 // ---------- learner: error log ----------
 
 export async function fetchErrors(onlyOpen: boolean): Promise<ErrorLogEntry[]> {

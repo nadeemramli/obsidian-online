@@ -19,6 +19,7 @@ import StatementPractice from './pages/practice/StatementPractice'
 import PracticeRun from './pages/practice/PracticeRun'
 import QuizRunner from './pages/practice/QuizRunner'
 import CaseRunner from './pages/practice/CaseRunner'
+import MockRunner from './pages/practice/MockRunner'
 import AttemptView from './pages/practice/AttemptView'
 import PracticeHistory from './pages/practice/PracticeHistory'
 import ErrorLogPage from './pages/practice/ErrorLogPage'
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="/practice/quiz/:quizId" element={<QuizRunner />} />
                 <Route path="/practice/case/:spineId" element={<CaseRunner />} />
                 <Route path="/practice/generated/:caseId" element={<CaseRunner />} />
+                <Route path="/practice/mock" element={<MockRunner />} />
                 <Route path="/practice/run/:itemId" element={<PracticeRun />} />
                 <Route path="/practice/attempt/:attemptId" element={<AttemptView />} />
                 <Route path="/practice/history" element={<PracticeHistory />} />

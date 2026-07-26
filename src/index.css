@@ -1035,6 +1035,44 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
 .stage-chip.done { color: var(--ok); border-color: rgba(74, 222, 128, 0.4); }
 .stage-title { margin: 0 0 4px; font-size: 16px; }
 
+/* --- Dashboard: recommendation + mastery --- */
+.reco-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--accent);
+  background: rgba(167, 139, 250, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: 4px 0 16px;
+}
+.reco-card h2 { margin: 2px 0 4px; font-size: 18px; }
+.reco-card p { margin: 0; font-size: 13.5px; }
+.mastery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.mastery-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.mastery-chip span { color: var(--muted); font-size: 12px; }
+.mastery-chip.m-unseen { border-left-color: var(--border); }
+.mastery-chip.m-needs_repair { border-left-color: var(--err); }
+.mastery-chip.m-needs_repair span { color: var(--err); }
+.mastery-chip.m-independent_success { border-left-color: var(--warn); }
+.mastery-chip.m-independent_success span { color: var(--warn); }
+.mastery-chip.m-transfer_success { border-left-color: var(--ok); }
+.mastery-chip.m-transfer_success span { color: var(--ok); }
+@media (max-width: 720px) {
+  .reco-card { flex-direction: column; align-items: stretch; }
+}
+
 /* --- Objective kinds --- */
 .choice-list { border: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .choice-row {

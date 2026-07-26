@@ -25,20 +25,22 @@ export default function StatementPractice() {
   const [spines, setSpines] = useState<PracticeSpine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
+  const [generating, setGenerating] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  async function onGenerate() {
-    setGenerating(true)
+  async function onGenerate(family: string) {
+    setGenerating(family)
     setError(null)
     try {
-      const res = await generateCase('sole_trader')
+      const res = await generateCase(family)
       navigate(`/practice/generated/${res.case_id}`)
     } catch (e: any) {
       setError(e.message || 'Generation failed')
-      setGenerating(false)
+      setGenerating(null)
     }
   }
+
+  const GENERATABLE = new Set(['sole_trader', 'limited_company'])
 
   useEffect(() => {
     let active = true
@@ -77,7 +79,7 @@ export default function StatementPractice() {
         const group = spines.filter((s) => s.family === family)
         // The altered retest variant is reached from case results, not listed here.
         const listed = group.filter((s) => !(s.config as any)?.is_retest_variant)
-        if (listed.length === 0 && group.length === 0 && family !== 'sole_trader') {
+        if (listed.length === 0 && group.length === 0 && !GENERATABLE.has(family)) {
           return (
             <section key={family}>
               <h3 className="section-h">{FAMILY_LABELS[family]}</h3>
@@ -98,20 +100,22 @@ export default function StatementPractice() {
                   <span className="activity-side">Case</span>
                 </Link>
               ))}
-              {family === 'sole_trader' && (
+              {GENERATABLE.has(family) && (
                 <button
                   className="activity-card static generate-card"
-                  onClick={onGenerate}
-                  disabled={generating}
+                  onClick={() => onGenerate(family)}
+                  disabled={generating !== null}
                 >
                   <div className="activity-main">
                     <strong>🎲 Generate a fresh case</strong>
                     <span className="muted activity-sub">
-                      A new entity and new numbers every time — same six skills, seeded and
+                      A new entity and new numbers every time — same core skills, seeded and
                       reproducible.
                     </span>
                   </div>
-                  <span className="activity-side">{generating ? 'Generating…' : 'New'}</span>
+                  <span className="activity-side">
+                    {generating === family ? 'Generating…' : 'New'}
+                  </span>
                 </button>
               )}
             </div>

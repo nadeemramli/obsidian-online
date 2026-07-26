@@ -79,6 +79,28 @@ maps PRD concepts to the as-built system and records scope decisions per ticket.
 - Learn mode remains the sequential immediate-feedback flow; cases stay Learn-mode
   (exam MTQs arrive with full-mock assembly in Phase 4).
 
+## Phases 4–5 delivered (first slices)
+
+- **Family 2 (limited company)**: `limited-company-v1` generator alongside the
+  sole-trader one in `case-generate` (v3). New skills: loan-interest accrual, the
+  income-tax provision, and dividends-as-distribution (the journal forces
+  Dr Retained earnings / Cr Dividends paid — the classic "not an expense" lesson).
+  Sales/purchases are derived from a sampled gross-margin ratio so the TB holds
+  exactly; SOFP balance proven algebraically and asserted per seed; 300-seed sweep.
+- **Mock assembly**: `ExamSession` extracted as the shared exam engine;
+  `/practice/mock` assembles Section A (the whole published objective pool) +
+  Section B (a statement-case spine) under one strict timer with per-section
+  subtotals. Scales to the full 35+2/100-mark shape as content grows — the §21.4
+  full-mock acceptance is content-gated, not engine-gated.
+- **Mastery (§12.5)**: `src/lib/practice/mastery.ts` derives per-skill states
+  (unseen / needs_repair / independent_success / transfer_success) from the
+  learner's attempt snapshots — the attempt store is the evidence store; transfer
+  requires a retest or generated source, so a repeated question can never promote.
+- **Next-best-action (§17.2)**: `recommend.ts` priority chain (repair loop →
+  altered-case retest → open drill errors → due reviews → start the case → mock),
+  surfaced as one dashboard recommendation card plus a repair queue, due-review
+  chips, and a mastery panel.
+
 ## Deliberate deferrals (per PRD phases 2–5)
 
 - Confidence capture, mastery state machine, recommendations, analytics dashboards.

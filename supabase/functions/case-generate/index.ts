@@ -7,6 +7,12 @@
 // table) under the caller's user id. The seed is stored for exact replay.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { generateSoleTraderCase, TEMPLATE } from './generator.ts'
+import { generateLimitedCompanyCase, LTD_TEMPLATE } from './limited.ts'
+
+const GENERATORS: Record<string, { generate: (seed: number) => any; template: string }> = {
+  sole_trader: { generate: generateSoleTraderCase, template: TEMPLATE },
+  limited_company: { generate: generateLimitedCompanyCase, template: LTD_TEMPLATE },
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -46,8 +52,8 @@ Deno.serve(async (req) => {
   }
 
   const family = body?.family ?? 'sole_trader'
-  if (family !== 'sole_trader')
-    return json({ error: `No generator for family "${family}" yet` }, 400)
+  const generatorDef = GENERATORS[family]
+  if (!generatorDef) return json({ error: `No generator for family "${family}" yet` }, 400)
 
   // Accept an explicit seed for exact reproduction; otherwise draw one from
   // the platform CSPRNG (the seed itself need not be deterministic — the case
@@ -63,7 +69,7 @@ Deno.serve(async (req) => {
 
   let generated
   try {
-    generated = generateSoleTraderCase(seed) // includes the invariant gate
+    generated = generatorDef.generate(seed) // includes the invariant gate
   } catch (e) {
     // Invariant failure blocks delivery (PRD §18.2). Should not happen —
     // generation is constructive — but if it does, the learner never sees it.
@@ -78,7 +84,7 @@ Deno.serve(async (req) => {
     .insert({
       user_id: user.id,
       family,
-      template: TEMPLATE,
+      template: generatorDef.template,
       seed,
       title: generated.title,
       stages: generated.stages,

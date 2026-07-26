@@ -8,7 +8,8 @@ test('learner generates a fresh sole-trader case and completes stage 1', async (
   mock.seedFernleaf()
   await login(page)
   await page.goto('/#/practice/statements')
-  await page.getByRole('button', { name: /Generate a fresh case/ }).click()
+  // Two families offer generation; the sole-trader card comes first.
+  await page.getByRole('button', { name: /Generate a fresh case/ }).first().click()
 
   // The runner opens on the generated case (deterministic mock seed).
   await expect(page.getByRole('heading', { name: /generated/ })).toBeVisible()
@@ -48,7 +49,7 @@ test('generated case results offer another generated variant', async ({ page, mo
   mock.seedFernleaf()
   await login(page)
   await page.goto('/#/practice/statements')
-  await page.getByRole('button', { name: /Generate a fresh case/ }).click()
+  await page.getByRole('button', { name: /Generate a fresh case/ }).first().click()
   await expect(page.getByText('0 of 18 entries completed')).toBeVisible()
 
   const caseRow = mock.generatedCases[0]

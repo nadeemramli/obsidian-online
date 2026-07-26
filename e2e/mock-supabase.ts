@@ -502,6 +502,13 @@ export class MockSupabase {
       }
     }
 
+    // ---- PostgREST: review_states ----
+    if (path === '/rest/v1/review_states') {
+      const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')
+      if (method === 'GET') return this.reply(route, [], wantsObject)
+      if (method === 'POST') return this.reply(route, [], wantsObject, 201)
+    }
+
     // ---- PostgREST: error_log ----
     if (path === '/rest/v1/error_log') {
       const wantsObject = (req.headers()['accept'] || '').includes('vnd.pgrst.object')

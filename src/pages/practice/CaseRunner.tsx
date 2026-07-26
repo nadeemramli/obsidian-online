@@ -21,6 +21,7 @@ type StageDef = {
 }
 type CaseSource = {
   title: string
+  family: string
   config: SpineDiagnosisConfig
   stages: StageDef[]
   isGenerated: boolean
@@ -69,6 +70,7 @@ export default function CaseRunner() {
           }))
           next = {
             title: row.title,
+            family: row.family,
             config: row.config as SpineDiagnosisConfig,
             stages,
             isGenerated: true,
@@ -83,6 +85,7 @@ export default function CaseRunner() {
           const fetched = await fetchItemsByIds(stageRows.map((st) => st.item_id))
           next = {
             title: s.title,
+            family: s.family,
             config: s.config as SpineDiagnosisConfig,
             stages: stageRows
               .map((st, i) => ({
@@ -153,7 +156,7 @@ export default function CaseRunner() {
   async function generateAnother() {
     setGenerating(true)
     try {
-      const res = await generateCase('sole_trader')
+      const res = await generateCase(source?.family ?? 'sole_trader')
       navigate(`/practice/generated/${res.case_id}`)
     } catch (e: any) {
       setError(e.message || 'Generation failed')
