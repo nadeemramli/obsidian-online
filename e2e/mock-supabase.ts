@@ -1,11 +1,19 @@
 import type { Page, Route } from '@playwright/test'
 import { SUPABASE_URL } from '../src/lib/config'
-import { scoreMatrix, type MatrixConfig, type MatrixAnswerKey } from '../src/lib/practice/scoring.ts'
+import {
+  scoreMatrix,
+  scoreJournal,
+  type MatrixConfig,
+  type MatrixAnswerKey,
+  type JournalConfig,
+  type JournalAnswerKey,
+} from '../src/lib/practice/scoring.ts'
 import {
   DUAL_EFFECT_ITEM,
   DUAL_EFFECT_KEY,
   DUAL_EFFECT_OVERALL,
 } from './practice-fixture'
+import { MUGG_ITEM, MUGG_KEY, MUGG_OVERALL } from './journal-fixture'
 
 export const TEST_EMAIL = 'reader@vault.test'
 export const TEST_PASSWORD = 'test-password-123'
@@ -114,6 +122,17 @@ export class MockSupabase {
       version: 1,
       answer_key: DUAL_EFFECT_KEY,
       overall_explanation_md: DUAL_EFFECT_OVERALL,
+    })
+  }
+
+  // Seed the Mugg journal_entry activity (Activity 8).
+  seedJournal() {
+    this.items.push(JSON.parse(JSON.stringify(MUGG_ITEM)) as unknown as MockItem)
+    this.answers.push({
+      item_id: MUGG_ITEM.id,
+      version: 1,
+      answer_key: MUGG_KEY as unknown as MatrixAnswerKey,
+      overall_explanation_md: MUGG_OVERALL,
     })
   }
 
@@ -404,11 +423,14 @@ export class MockSupabase {
       if (!item) return json(route, { error: 'Activity not found' }, 404)
       const key = this.answers.find((a) => a.item_id === item.id && a.version === item.version)
       if (!key) return json(route, { error: 'This activity has no answer key yet' }, 500)
-      const feedback = scoreMatrix(
-        item.config as MatrixConfig,
-        key.answer_key,
-        body.answers ?? {},
-      )
+      const feedback =
+        (item as any).kind === 'journal_entry'
+          ? scoreJournal(
+              item.config as unknown as JournalConfig,
+              key.answer_key as unknown as JournalAnswerKey,
+              body.answers ?? {},
+            )
+          : scoreMatrix(item.config as MatrixConfig, key.answer_key, body.answers ?? {})
       const storedFeedback = {
         ...feedback,
         overall_explanation_md: key.overall_explanation_md,

@@ -43,7 +43,7 @@ export type RowFeedback = {
 }
 
 export type MatrixFeedback = {
-  kind: 'matrix_select'
+  kind: 'matrix_select' | 'journal_entry'
   // Self-contained snapshot: column and option labels are embedded at scoring
   // time so a stored attempt stays readable even after the question is edited.
   columns: MatrixColumn[]
@@ -102,6 +102,103 @@ export function scoreMatrix(
 
   return {
     kind: 'matrix_select',
+    columns: config.columns.map((c) => ({ id: c.id, label: c.label })),
+    option_labels: optionLabels,
+    rows,
+    cell_score: cellScore,
+    cell_max: cellMax,
+    tx_correct: txCorrect,
+    tx_total: config.rows.length,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// journal_entry — "prepare the journal entries" questions (FS preparation).
+// Config reuses the matrix shape with exactly three columns: debit, credit
+// (account pickers over a shared option set) and amount (numeric input).
+// The scorer emits the same self-contained MatrixFeedback snapshot, so the
+// results renderer and stored attempts are kind-agnostic.
+// ---------------------------------------------------------------------------
+
+export type JournalConfig = {
+  scenario_md?: string // trial balance / background, rendered above the rows
+  note_md?: string
+  columns: MatrixColumn[] // must be debit / credit / amount
+  rows: MatrixRow[]
+  options: MatrixOption[] // the account list shared by debit and credit
+}
+
+export type JournalKeyRow = {
+  debit: string
+  credit: string
+  amount: number
+  tolerance?: number // absolute; defaults to 0 (exact)
+  explanation_md: string
+}
+export type JournalAnswerKey = { rows: Record<string, JournalKeyRow> }
+
+// Amounts arrive as the raw input string; parse strictly (plain number,
+// optional thousands commas) so "1,740" works but "10+10" does not.
+export function parseAmount(raw: string | undefined | null): number | null {
+  if (typeof raw !== 'string') return null
+  const cleaned = raw.replace(/,/g, '').trim()
+  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return null
+  return Number(cleaned)
+}
+
+export function scoreJournal(
+  config: JournalConfig,
+  key: JournalAnswerKey,
+  response: MatrixResponse,
+): MatrixFeedback {
+  const rows: RowFeedback[] = []
+  let cellScore = 0
+  let cellMax = 0
+  let txCorrect = 0
+
+  for (const row of config.rows) {
+    const keyRow = key.rows[row.id]
+    if (!keyRow) throw new Error(`answer key missing row "${row.id}"`)
+    const cells: CellVerdict[] = []
+    let rowCorrect = true
+    for (const col of config.columns) {
+      const raw = response?.[row.id]?.[col.id]
+      const selected = typeof raw === 'string' && raw.trim() ? raw.trim() : null
+      let correct: string
+      let ok: boolean
+      if (col.id === 'amount') {
+        correct = String(keyRow.amount)
+        const parsed = parseAmount(selected)
+        const tolerance = typeof keyRow.tolerance === 'number' ? keyRow.tolerance : 0
+        ok = parsed !== null && Math.abs(parsed - keyRow.amount) <= tolerance
+      } else {
+        const expected = keyRow[col.id as 'debit' | 'credit']
+        if (typeof expected !== 'string' || !expected) {
+          throw new Error(`answer key missing cell "${row.id}.${col.id}"`)
+        }
+        correct = expected
+        ok = selected === expected
+      }
+      cellMax += 1
+      if (ok) cellScore += 1
+      else rowCorrect = false
+      cells.push({ column_id: col.id, selected, correct, ok })
+    }
+    if (rowCorrect) txCorrect += 1
+    rows.push({
+      row_id: row.id,
+      row_label: row.label,
+      cells,
+      row_correct: rowCorrect,
+      explanation_md: typeof keyRow.explanation_md === 'string' ? keyRow.explanation_md : '',
+    })
+  }
+
+  const optionLabels: Record<string, string> = {}
+  for (const o of config.options) optionLabels[o.id] = o.label
+
+  return {
+    kind: 'journal_entry',
     columns: config.columns.map((c) => ({ id: c.id, label: c.label })),
     option_labels: optionLabels,
     rows,

@@ -919,15 +919,62 @@ a.activity-card:hover { border-color: var(--accent); text-decoration: none; }
 .builder-actions { display: flex; gap: 6px; }
 .activity-card.static .builder-actions .btn { font-size: 12.5px; padding: 5px 10px; }
 
+/* --- Journal-entry runner --- */
+.journal-scenario {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 18px;
+  margin: 14px 0 4px;
+  font-size: 15px;
+}
+.journal-scenario table { font-size: 13.5px; }
+.jr { margin-top: 16px; }
+.jr-head {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.5fr) 1fr 1fr 110px;
+  gap: 10px;
+  padding: 0 12px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.jr-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.5fr) 1fr 1fr 110px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  margin: 0 0 8px;
+  padding: 10px 12px;
+}
+.jr-row legend.jr-item {
+  float: left;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.jr-row .matrix-tx-num { margin-top: 1px; }
+.jr-cell { display: flex; flex-direction: column; gap: 2px; }
+.jr-cell select, .jr-cell input { font-size: 13.5px; padding: 8px 10px; }
+.jr-amount input { font-variant-numeric: tabular-nums; text-align: right; }
+
 /* --- Small screens: matrix becomes cards; builder stacks --- */
 @media (max-width: 860px) {
   .builder-split { grid-template-columns: 1fr; }
   .builder-preview { position: static; }
 }
 @media (max-width: 720px) {
-  .matrix-head { display: none; }
+  .matrix-head, .jr-head { display: none; }
   .matrix-row { grid-template-columns: 1fr; align-items: stretch; gap: 8px; padding: 12px 14px; }
-  .matrix-row legend.matrix-tx { font-weight: 600; }
+  .jr-row { grid-template-columns: 1fr; align-items: stretch; gap: 8px; padding: 12px 14px; }
+  .matrix-row legend.matrix-tx, .jr-row legend.jr-item { font-weight: 600; }
   .matrix-cell-label { display: block; }
   .result-cells { grid-template-columns: 1fr; }
   .stat-row { grid-template-columns: 1fr; }

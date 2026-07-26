@@ -19,6 +19,16 @@ const DEFAULT_MATRIX_CONFIG = {
   options: [],
 } as unknown as Json
 
+const DEFAULT_JOURNAL_CONFIG = {
+  columns: [
+    { id: 'debit', label: 'Debit account' },
+    { id: 'credit', label: 'Credit account' },
+    { id: 'amount', label: 'Amount ($)' },
+  ],
+  rows: [],
+  options: [],
+} as unknown as Json
+
 export default function BuilderList() {
   const [items, setItems] = useState<LearningItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,13 +51,13 @@ export default function BuilderList() {
     void reload()
   }, [])
 
-  async function newQuestion() {
+  async function newQuestion(kind: 'matrix_select' | 'journal_entry') {
     setBusy(true)
     try {
       const item = await createDraftItem({
-        kind: 'matrix_select',
-        title: 'Untitled matrix question',
-        config: DEFAULT_MATRIX_CONFIG,
+        kind,
+        title: kind === 'journal_entry' ? 'Untitled journal question' : 'Untitled matrix question',
+        config: kind === 'journal_entry' ? DEFAULT_JOURNAL_CONFIG : DEFAULT_MATRIX_CONFIG,
       })
       navigate(`/builder/item/${item.id}`)
     } catch (e: any) {
@@ -114,9 +124,14 @@ export default function BuilderList() {
     <div className="page practice-page">
       <div className="page-head">
         <h1>Question builder</h1>
-        <button className="btn primary" onClick={newQuestion} disabled={busy}>
-          + New matrix question
-        </button>
+        <div className="head-actions">
+          <button className="btn primary" onClick={() => newQuestion('matrix_select')} disabled={busy}>
+            + New matrix question
+          </button>
+          <button className="btn primary" onClick={() => newQuestion('journal_entry')} disabled={busy}>
+            + New journal question
+          </button>
+        </div>
       </div>
       {error && <p className="msg error">{error}</p>}
       {groups.map(([label, group]) => (

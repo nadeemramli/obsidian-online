@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   deleteItem,
-  fetchItem,
   fetchItemAnswers,
   updateItem,
   upsertItemAnswers,
@@ -10,93 +9,66 @@ import {
 } from '../../lib/practice/api'
 import type { Json } from '../../lib/database.types'
 import {
-  scoreMatrix,
-  type MatrixConfig,
+  scoreJournal,
+  type JournalConfig,
   type MatrixFeedback,
   type MatrixResponse,
 } from '../../lib/practice/scoring.ts'
 import {
-  validateMatrixConfig,
-  validateMatrixKey,
+  validateJournalConfig,
+  validateJournalKey,
   type ValidationIssue,
 } from '../../lib/practice/validate.ts'
-import { MatrixRunner } from '../../components/practice/MatrixRunner'
+import { JournalRunner } from '../../components/practice/JournalRunner'
 import { MatrixResults } from '../../components/practice/MatrixResults'
-import { JournalEditor } from './JournalEditor'
 
-type RowDraft = { id: string; label: string; debit: string; credit: string; explanation: string }
+type RowDraft = {
+  id: string
+  label: string
+  debit: string
+  credit: string
+  amount: string
+  explanation: string
+}
 type OptionDraft = { id: string; label: string }
 
 const newId = () => crypto.randomUUID().slice(0, 8)
 
-export default function BuilderItem() {
-  const { itemId } = useParams()
+const JOURNAL_COLUMNS = [
+  { id: 'debit', label: 'Debit account' },
+  { id: 'credit', label: 'Credit account' },
+  { id: 'amount', label: 'Amount ($)' },
+]
+
+// Editor for journal_entry questions (FS-preparation part 1). Same chrome and
+// lifecycle as the matrix editor: draft saves keep the version, publishing a
+// published item bumps it, answers are written before the item row.
+export function JournalEditor({ item: initial }: { item: LearningItem }) {
   const navigate = useNavigate()
+  const [item, setItem] = useState(initial)
 
-  const [item, setItem] = useState<LearningItem | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-
-  // Form state
-  const [title, setTitle] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [noteMd, setNoteMd] = useState('')
-  const [paper, setPaper] = useState('')
-  const [syllabusArea, setSyllabusArea] = useState('')
-  const [topic, setTopic] = useState('')
-  const [tagsText, setTagsText] = useState('')
-  const [difficulty, setDifficulty] = useState('')
-  const [sourceSlug, setSourceSlug] = useState('')
+  const [title, setTitle] = useState(initial.title)
+  const [prompt, setPrompt] = useState(initial.prompt_md)
+  const [scenario, setScenario] = useState('')
+  const [paper, setPaper] = useState(initial.paper ?? '')
+  const [topic, setTopic] = useState(initial.topic ?? '')
+  const [difficulty, setDifficulty] = useState(initial.difficulty ?? '')
+  const [sourceSlug, setSourceSlug] = useState(initial.source_slug ?? '')
   const [options, setOptions] = useState<OptionDraft[]>([])
   const [rows, setRows] = useState<RowDraft[]>([])
   const [overall, setOverall] = useState('')
-  const [columns, setColumns] = useState<Array<{ id: string; label: string }>>([
-    { id: 'debit', label: 'Debit' },
-    { id: 'credit', label: 'Credit' },
-  ])
 
-  const [baseline, setBaseline] = useState('') // serialized form for dirty tracking
+  const [baseline, setBaseline] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState<string | null>(null)
   const [issues, setIssues] = useState<ValidationIssue[]>([])
-
-  // Preview state
   const [previewResponse, setPreviewResponse] = useState<MatrixResponse>({})
   const [previewFeedback, setPreviewFeedback] = useState<MatrixFeedback | null>(null)
 
-  const serialize = (s: {
-    title: string
-    prompt: string
-    noteMd: string
-    paper: string
-    syllabusArea: string
-    topic: string
-    tagsText: string
-    difficulty: string
-    sourceSlug: string
-    options: OptionDraft[]
-    rows: RowDraft[]
-    overall: string
-  }) => JSON.stringify(s)
+  const snapshot = JSON.stringify({ title, prompt, scenario, paper, topic, difficulty, sourceSlug, options, rows, overall })
+  const dirty = baseline !== '' && snapshot !== baseline
 
-  const currentSerialized = serialize({
-    title,
-    prompt,
-    noteMd,
-    paper,
-    syllabusArea,
-    topic,
-    tagsText,
-    difficulty,
-    sourceSlug,
-    options,
-    rows,
-    overall,
-  })
-  const dirty = baseline !== '' && currentSerialized !== baseline
-
-  // Warn on tab close with unsaved changes. (In-app navigation uses the Back
-  // link below, which confirms explicitly — HashRouter has no useBlocker.)
   useEffect(() => {
     if (!dirty) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -109,59 +81,38 @@ export default function BuilderItem() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    Promise.all([fetchItem(itemId!)])
-      .then(async ([it]) => {
+    const cfg = (initial.config ?? {}) as any
+    fetchItemAnswers(initial.id, initial.version)
+      .then((answers) => {
         if (!active) return
-        if (!it) {
-          setNotFound(true)
-          return
-        }
-        setItem(it)
-        const cfg = (it.config ?? {}) as any
-        const answers = await fetchItemAnswers(it.id, it.version)
         const keyRows = ((answers?.answer_key as any)?.rows ?? {}) as Record<string, any>
-        const cols =
-          Array.isArray(cfg.columns) && cfg.columns.length > 0
-            ? cfg.columns
-            : [
-                { id: 'debit', label: 'Debit' },
-                { id: 'credit', label: 'Credit' },
-              ]
-        const loaded = {
-          title: it.title,
-          prompt: it.prompt_md,
-          noteMd: typeof cfg.note_md === 'string' ? cfg.note_md : '',
-          paper: it.paper ?? '',
-          syllabusArea: it.syllabus_area ?? '',
-          topic: it.topic ?? '',
-          tagsText: (it.tags ?? []).join(', '),
-          difficulty: it.difficulty ?? '',
-          sourceSlug: it.source_slug ?? '',
-          options: (Array.isArray(cfg.options) ? cfg.options : []) as OptionDraft[],
-          rows: (Array.isArray(cfg.rows) ? cfg.rows : []).map((r: any) => ({
-            id: r.id,
-            label: r.label ?? '',
-            debit: keyRows[r.id]?.[cols[0].id] ?? '',
-            credit: keyRows[r.id]?.[cols[1]?.id] ?? '',
-            explanation: keyRows[r.id]?.explanation_md ?? '',
-          })),
-          overall: answers?.overall_explanation_md ?? '',
-        }
-        setColumns(cols)
-        setTitle(loaded.title)
-        setPrompt(loaded.prompt)
-        setNoteMd(loaded.noteMd)
-        setPaper(loaded.paper)
-        setSyllabusArea(loaded.syllabusArea)
-        setTopic(loaded.topic)
-        setTagsText(loaded.tagsText)
-        setDifficulty(loaded.difficulty)
-        setSourceSlug(loaded.sourceSlug)
-        setOptions(loaded.options)
-        setRows(loaded.rows)
-        setOverall(loaded.overall)
-        setBaseline(serialize(loaded))
+        const loadedOptions = (Array.isArray(cfg.options) ? cfg.options : []) as OptionDraft[]
+        const loadedRows = (Array.isArray(cfg.rows) ? cfg.rows : []).map((r: any) => ({
+          id: r.id,
+          label: r.label ?? '',
+          debit: keyRows[r.id]?.debit ?? '',
+          credit: keyRows[r.id]?.credit ?? '',
+          amount: keyRows[r.id]?.amount != null ? String(keyRows[r.id].amount) : '',
+          explanation: keyRows[r.id]?.explanation_md ?? '',
+        }))
+        setScenario(typeof cfg.scenario_md === 'string' ? cfg.scenario_md : '')
+        setOptions(loadedOptions)
+        setRows(loadedRows)
+        setOverall(answers?.overall_explanation_md ?? '')
+        setBaseline(
+          JSON.stringify({
+            title: initial.title,
+            prompt: initial.prompt_md,
+            scenario: typeof cfg.scenario_md === 'string' ? cfg.scenario_md : '',
+            paper: initial.paper ?? '',
+            topic: initial.topic ?? '',
+            difficulty: initial.difficulty ?? '',
+            sourceSlug: initial.source_slug ?? '',
+            options: loadedOptions,
+            rows: loadedRows,
+            overall: answers?.overall_explanation_md ?? '',
+          }),
+        )
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -169,41 +120,45 @@ export default function BuilderItem() {
     return () => {
       active = false
     }
-  }, [itemId])
+  }, [initial])
 
-  const config: MatrixConfig = useMemo(
+  const config: JournalConfig = useMemo(
     () => ({
-      ...(noteMd.trim() ? { note_md: noteMd } : {}),
-      columns,
+      ...(scenario.trim() ? { scenario_md: scenario } : {}),
+      columns: JOURNAL_COLUMNS,
       rows: rows.map((r) => ({ id: r.id, label: r.label })),
       options,
     }),
-    [noteMd, columns, rows, options],
+    [scenario, rows, options],
   )
 
-  const answerKey = useMemo(() => {
-    const keyRows: Record<string, Record<string, string>> = {}
-    for (const r of rows) {
-      keyRows[r.id] = {
-        [columns[0].id]: r.debit,
-        ...(columns[1] ? { [columns[1].id]: r.credit } : {}),
-        explanation_md: r.explanation,
-      }
-    }
-    return { rows: keyRows }
-  }, [rows, columns])
+  const answerKey = useMemo(
+    () => ({
+      rows: Object.fromEntries(
+        rows.map((r) => [
+          r.id,
+          {
+            debit: r.debit,
+            credit: r.credit,
+            amount: r.amount.trim() === '' ? NaN : Number(r.amount.replace(/,/g, '')),
+            explanation_md: r.explanation,
+          },
+        ]),
+      ),
+    }),
+    [rows],
+  )
 
   function validateAll(): ValidationIssue[] {
     const all: ValidationIssue[] = []
     if (!title.trim()) all.push({ path: 'title', message: 'Title is required' })
     if (!prompt.trim()) all.push({ path: 'prompt', message: 'Prompt / instructions are required' })
-    all.push(...validateMatrixConfig(config))
-    if (all.length === 0) all.push(...validateMatrixKey(config, answerKey))
+    all.push(...validateJournalConfig(config))
+    if (all.length === 0) all.push(...validateJournalKey(config, answerKey))
     return all
   }
 
   async function save(status?: 'draft' | 'published') {
-    if (!item) return
     const targetStatus = status ?? (item.status as 'draft' | 'published')
     if (targetStatus === 'published') {
       const found = validateAll()
@@ -217,11 +172,8 @@ export default function BuilderItem() {
     setBusy(true)
     setMsg(null)
     try {
-      // Editing a published question bumps the version so historical attempts
-      // (which pin item_version) keep their meaning.
       const bump = item.status === 'published'
       const version = bump ? item.version + 1 : item.version
-      // Answers first: never leave a published item without its key.
       await upsertItemAnswers({
         item_id: item.id,
         version,
@@ -233,24 +185,15 @@ export default function BuilderItem() {
         prompt_md: prompt,
         config: config as unknown as Json,
         paper: paper.trim() || null,
-        syllabus_area: syllabusArea.trim() || null,
         topic: topic.trim() || null,
-        tags: tagsText
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
         difficulty: difficulty || null,
         source_slug: sourceSlug.trim() || null,
         version,
         status: targetStatus,
       })
       setItem(updated)
-      setBaseline(currentSerialized)
-      setMsg(
-        targetStatus === 'published'
-          ? `Published (version ${version}).`
-          : 'Draft saved.',
-      )
+      setBaseline(snapshot)
+      setMsg(targetStatus === 'published' ? `Published (version ${version}).` : 'Draft saved.')
     } catch (e: any) {
       setMsg(e.message || 'Save failed')
     } finally {
@@ -259,7 +202,6 @@ export default function BuilderItem() {
   }
 
   async function remove() {
-    if (!item) return
     if (!window.confirm(`Delete "${item.title}"? Attempts against it will be kept.`)) return
     setBusy(true)
     try {
@@ -284,10 +226,11 @@ export default function BuilderItem() {
       return
     }
     setIssues([])
-    setPreviewFeedback(scoreMatrix(config, answerKey, previewResponse))
+    setPreviewFeedback(scoreJournal(config, answerKey as any, previewResponse))
   }
 
-  // ---- row/option operations (stable ids; reorder can't corrupt keys) ----
+  const setRow = (id: string, patch: Partial<RowDraft>) =>
+    setRows((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
   const moveRow = (i: number, dir: -1 | 1) =>
     setRows((prev) => {
       const j = i + dir
@@ -298,28 +241,6 @@ export default function BuilderItem() {
     })
 
   if (loading) return <div className="page muted">Loading question…</div>
-  if (notFound || !item)
-    return (
-      <div className="page">
-        <h1>Question not found</h1>
-        <Link className="btn" to="/builder">
-          ← Back to builder
-        </Link>
-      </div>
-    )
-
-  // Other kinds get their own editor; this component stays the matrix editor.
-  if (item.kind === 'journal_entry') return <JournalEditor item={item} />
-  if (item.kind !== 'matrix_select')
-    return (
-      <div className="page">
-        <h1>Unsupported question kind</h1>
-        <p className="muted">No editor is registered for "{item.kind}".</p>
-        <Link className="btn" to="/builder">
-          ← Back to builder
-        </Link>
-      </div>
-    )
 
   return (
     <div className="page builder-page">
@@ -329,9 +250,9 @@ export default function BuilderItem() {
         </button>
       </div>
       <div className="page-head">
-        <h1>Edit question</h1>
+        <h1>Edit journal question</h1>
         <div className="head-actions">
-          <span className={'save-state'}>
+          <span className="save-state">
             {dirty ? 'Unsaved changes' : 'All changes saved'} · {item.status} · v{item.version}
           </span>
           <button className="btn" onClick={() => save('draft')} disabled={busy}>
@@ -362,11 +283,11 @@ export default function BuilderItem() {
           </label>
           <label className="field">
             <span>Prompt / instructions (markdown)</span>
-            <textarea rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+            <textarea rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           </label>
           <label className="field">
-            <span>Note / callout (optional)</span>
-            <textarea rows={2} value={noteMd} onChange={(e) => setNoteMd(e.target.value)} />
+            <span>Scenario (markdown — trial balance, notes, etc.)</span>
+            <textarea rows={10} value={scenario} onChange={(e) => setScenario(e.target.value)} />
           </label>
 
           <div className="field-grid">
@@ -389,71 +310,46 @@ export default function BuilderItem() {
             </label>
             <label className="field">
               <span>Source note slug</span>
-              <input
-                value={sourceSlug}
-                onChange={(e) => setSourceSlug(e.target.value)}
-                placeholder="05-ledger-accounts-and-double-entry"
-              />
-            </label>
-            <label className="field">
-              <span>Syllabus area</span>
-              <input value={syllabusArea} onChange={(e) => setSyllabusArea(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Tags (comma-separated)</span>
-              <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+              <input value={sourceSlug} onChange={(e) => setSourceSlug(e.target.value)} />
             </label>
           </div>
 
-          <h3 className="section-h">Answer options</h3>
-          <p className="hint">The shared dropdown list. Every row's correct answers must be in it.</p>
+          <h3 className="section-h">Account list</h3>
+          <p className="hint">The accounts available in the debit and credit dropdowns.</p>
           {options.map((o, i) => (
             <div className="option-row" key={o.id}>
               <input
                 value={o.label}
-                aria-label={`Option ${i + 1} label`}
+                aria-label={`Account ${i + 1} label`}
                 onChange={(e) =>
                   setOptions((prev) => prev.map((p) => (p.id === o.id ? { ...p, label: e.target.value } : p)))
                 }
               />
               <button
                 className="btn danger"
-                aria-label={`Delete option ${o.label || i + 1}`}
+                aria-label={`Delete account ${o.label || i + 1}`}
                 onClick={() => setOptions((prev) => prev.filter((p) => p.id !== o.id))}
               >
                 ✕
               </button>
             </div>
           ))}
-          <button
-            className="btn"
-            onClick={() => setOptions((prev) => [...prev, { id: newId(), label: '' }])}
-          >
-            + Add option
+          <button className="btn" onClick={() => setOptions((prev) => [...prev, { id: newId(), label: '' }])}>
+            + Add account
           </button>
 
-          <h3 className="section-h">Transactions (rows)</h3>
+          <h3 className="section-h">Journal items (rows)</h3>
           {rows.map((r, i) => (
             <fieldset className="row-editor" key={r.id}>
-              <legend>Row {i + 1}</legend>
+              <legend>Item {i + 1}</legend>
               <label className="field">
-                <span>Transaction</span>
-                <input
-                  value={r.label}
-                  onChange={(e) =>
-                    setRows((prev) => prev.map((p) => (p.id === r.id ? { ...p, label: e.target.value } : p)))
-                  }
-                />
+                <span>Item description</span>
+                <textarea rows={2} value={r.label} onChange={(e) => setRow(r.id, { label: e.target.value })} />
               </label>
               <div className="field-grid">
                 <label className="field">
-                  <span>Correct {columns[0].label.toLowerCase()}</span>
-                  <select
-                    value={r.debit}
-                    onChange={(e) =>
-                      setRows((prev) => prev.map((p) => (p.id === r.id ? { ...p, debit: e.target.value } : p)))
-                    }
-                  >
+                  <span>Debit account</span>
+                  <select value={r.debit} onChange={(e) => setRow(r.id, { debit: e.target.value })}>
                     <option value="">— choose —</option>
                     {options.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -462,37 +358,32 @@ export default function BuilderItem() {
                     ))}
                   </select>
                 </label>
-                {columns[1] && (
-                  <label className="field">
-                    <span>Correct {columns[1].label.toLowerCase()}</span>
-                    <select
-                      value={r.credit}
-                      onChange={(e) =>
-                        setRows((prev) =>
-                          prev.map((p) => (p.id === r.id ? { ...p, credit: e.target.value } : p)),
-                        )
-                      }
-                    >
-                      <option value="">— choose —</option>
-                      {options.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                <label className="field">
+                  <span>Credit account</span>
+                  <select value={r.credit} onChange={(e) => setRow(r.id, { credit: e.target.value })}>
+                    <option value="">— choose —</option>
+                    {options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Amount ($)</span>
+                  <input
+                    inputMode="decimal"
+                    value={r.amount}
+                    onChange={(e) => setRow(r.id, { amount: e.target.value })}
+                  />
+                </label>
               </div>
               <label className="field">
-                <span>Row explanation (markdown)</span>
+                <span>Item explanation (markdown)</span>
                 <textarea
                   rows={2}
                   value={r.explanation}
-                  onChange={(e) =>
-                    setRows((prev) =>
-                      prev.map((p) => (p.id === r.id ? { ...p, explanation: e.target.value } : p)),
-                    )
-                  }
+                  onChange={(e) => setRow(r.id, { explanation: e.target.value })}
                 />
               </label>
               <div className="row-editor-actions">
@@ -505,14 +396,11 @@ export default function BuilderItem() {
                 <button
                   className="btn danger"
                   onClick={() => {
-                    if (
-                      !r.label.trim() ||
-                      window.confirm(`Delete row "${r.label}"?`)
-                    )
+                    if (!r.label.trim() || window.confirm(`Delete item "${r.label}"?`))
                       setRows((prev) => prev.filter((p) => p.id !== r.id))
                   }}
                 >
-                  Delete row
+                  Delete item
                 </button>
               </div>
             </fieldset>
@@ -522,11 +410,11 @@ export default function BuilderItem() {
             onClick={() =>
               setRows((prev) => [
                 ...prev,
-                { id: newId(), label: '', debit: '', credit: '', explanation: '' },
+                { id: newId(), label: '', debit: '', credit: '', amount: '', explanation: '' },
               ])
             }
           >
-            + Add transaction
+            + Add journal item
           </button>
 
           <h3 className="section-h">Overall explanation (markdown)</h3>
@@ -561,12 +449,6 @@ export default function BuilderItem() {
             <div className="markdown question-prompt">
               <p>{prompt || <span className="muted">(prompt goes here)</span>}</p>
             </div>
-            {noteMd.trim() && (
-              <div className="question-note">
-                <span className="question-note-title">Note</span>
-                <p>{noteMd}</p>
-              </div>
-            )}
             {previewFeedback ? (
               <>
                 <MatrixResults
@@ -576,19 +458,19 @@ export default function BuilderItem() {
                 <p className="hint">Post-submit state (simulated locally — nothing is stored).</p>
               </>
             ) : rows.length > 0 && options.length > 0 ? (
-              <MatrixRunner
+              <JournalRunner
                 config={config}
                 response={previewResponse}
-                onChange={(rowId, colId, optionId) =>
+                onChange={(rowId, colId, value) =>
                   setPreviewResponse((prev) => ({
                     ...prev,
-                    [rowId]: { ...prev[rowId], [colId]: optionId || undefined },
+                    [rowId]: { ...prev[rowId], [colId]: value || undefined },
                   }))
                 }
                 disabled={false}
               />
             ) : (
-              <p className="muted">Add options and at least one transaction to preview.</p>
+              <p className="muted">Add accounts and at least one journal item to preview.</p>
             )}
           </div>
         </div>

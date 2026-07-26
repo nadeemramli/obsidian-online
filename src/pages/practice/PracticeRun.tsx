@@ -14,33 +14,9 @@ import {
   type LearningItem,
   type SubmitResult,
 } from '../../lib/practice/api'
-import {
-  countAnswered,
-  totalCells,
-  type MatrixConfig,
-  type MatrixResponse,
-} from '../../lib/practice/scoring.ts'
-import { validateMatrixConfig } from '../../lib/practice/validate.ts'
-import { MatrixRunner } from '../../components/practice/MatrixRunner'
+import { type MatrixResponse } from '../../lib/practice/scoring.ts'
+import { questionKinds } from '../../lib/practice/registry'
 import { MatrixResults } from '../../components/practice/MatrixResults'
-
-// Drop draft selections that no longer exist in the config (the question may
-// have been edited since the draft was saved).
-function sanitizeResponse(config: MatrixConfig, r: MatrixResponse): MatrixResponse {
-  const optionIds = new Set(config.options.map((o) => o.id))
-  const colIds = new Set(config.columns.map((c) => c.id))
-  const out: MatrixResponse = {}
-  for (const row of config.rows) {
-    const cells = r?.[row.id]
-    if (!cells) continue
-    for (const [colId, opt] of Object.entries(cells)) {
-      if (colIds.has(colId) && typeof opt === 'string' && optionIds.has(opt)) {
-        ;(out[row.id] ??= {})[colId] = opt
-      }
-    }
-  }
-  return out
-}
 
 export default function PracticeRun() {
   const { itemId } = useParams()
@@ -64,11 +40,11 @@ export default function PracticeRun() {
     startedAt: 0,
   })
 
+  const kindDef = item ? questionKinds[item.kind] : undefined
   const config = useMemo(() => {
-    if (!item || item.kind !== 'matrix_select') return null
-    const c = item.config as unknown
-    return validateMatrixConfig(c).length === 0 ? (c as MatrixConfig) : null
-  }, [item])
+    if (!item || !kindDef) return null
+    return kindDef.parseConfig(item.config)
+  }, [item, kindDef])
 
   // Load the item.
   useEffect(() => {
@@ -101,7 +77,7 @@ export default function PracticeRun() {
         submissionId: draft.client_submission_id,
         startedAt: draft.started_at || Date.now(),
       }
-      setResponse(sanitizeResponse(config, draft.answers))
+      setResponse(kindDef!.sanitize(config, draft.answers))
     } else {
       runRef.current = {
         sessionId: null,
@@ -243,8 +219,9 @@ export default function PracticeRun() {
       </div>
     )
 
-  const answered = countAnswered(config, response)
-  const total = totalCells(config)
+  const answered = kindDef!.countAnswered(config, response)
+  const total = kindDef!.totalCells(config)
+  const Runner = kindDef!.Runner
   const complete = answered === total
   const sourceNote = item.source_slug && knownSlugs.has(item.source_slug) ? item.source_slug : null
 
@@ -287,7 +264,7 @@ export default function PracticeRun() {
           />
         ) : (
           <>
-            <MatrixRunner
+            <Runner
               config={config}
               response={response}
               onChange={onChange}

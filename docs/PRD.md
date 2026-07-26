@@ -102,10 +102,16 @@ Authorization checks never read user-editable metadata.
 
 ### B.7 Question-type model
 
-A **registry** keyed by `kind` maps each question type to its runner component,
-builder component, config validator, and scorer. First registered kind:
-`matrix_select`. Future kinds (single/multi MCQ, numeric, short text, matching,
-ordering, journal entry, scenario) plug in without touching the runner page.
+A **registry** keyed by `kind` (`src/lib/practice/registry.tsx`) maps each question
+type to its runner component, builder component, config validator, and scorer.
+Registered kinds: `matrix_select` and `journal_entry` (financial-statement
+preparation part 1: debit account + credit account + numeric amount per item, a
+markdown scenario such as a trial balance, strict amount parsing with optional
+per-row tolerance — 3 scorable cells per item). Both kinds emit the same
+self-contained feedback snapshot, so results rendering, history, and the error
+log are kind-agnostic. Future kinds (single/multi MCQ, numeric, short text,
+matching, ordering, statement-line preparation, scenario) plug in without
+touching the runner page.
 
 `matrix_select` config (JSONB, validated at runtime — no executable code allowed):
 
@@ -185,10 +191,15 @@ sink exists these are emitted as no-ops from one module (`src/lib/practice/analy
 
 ### B.13 Phased roadmap
 
-1. **This slice** — matrix_select end-to-end + builder + roles + RLS.
-2. Due-review queue on the dashboard from `review_states`; confidence rating capture.
-3. MCQ + numeric kinds; quiz assembly UX; timed quizzes.
-4. Interleaving + `exam_blueprints` + readiness reporting; analytics sink.
+1. **Done** — matrix_select end-to-end + builder + roles + RLS; 7 seeded matrix
+   activities (Dual effect, period-end adjustments, DEAD CLIC classification,
+   books of prime entry, normal balances, error types, cost behaviour).
+2. **Done** — `journal_entry` kind + dedicated builder; seeded Mugg FS-preparation
+   activity (trial balance scenario, 10 entries, 30 cells).
+3. Due-review queue on the dashboard from `review_states`; confidence rating capture.
+4. Statement-line numeric kind (FS preparation part 2: build the income statement
+   and SOFP from the adjusted figures); MCQ kind; quiz assembly UX; timed quizzes.
+5. Interleaving + `exam_blueprints` + readiness reporting; analytics sink.
 
 ### B.14 Deviations from the original build-prompt (repository won)
 

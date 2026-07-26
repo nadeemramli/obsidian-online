@@ -17,14 +17,19 @@
 // scoring.ts / validate.ts here are byte-for-byte copies of
 // src/lib/practice/*.ts — the unit suite fails if they drift.
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { scoreMatrix } from './scoring.ts'
+import { scoreMatrix, scoreJournal, type MatrixFeedback } from './scoring.ts'
 import {
   validateMatrixConfig,
   validateMatrixKey,
   validateMatrixResponse,
+  validateJournalConfig,
+  validateJournalKey,
+  validateJournalResponse,
   asMatrixConfig,
   asMatrixKey,
   asMatrixResponse,
+  asJournalConfig,
+  asJournalKey,
 } from './validate.ts'
 
 const CORS = {
@@ -122,14 +127,19 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (itemError) return json({ error: itemError.message }, 500)
   if (!item) return json({ error: 'Activity not found' }, 404)
-  if (item.kind !== 'matrix_select')
+  if (item.kind !== 'matrix_select' && item.kind !== 'journal_entry')
     return json({ error: `Unsupported question kind "${item.kind}"` }, 400)
 
-  const configIssues = validateMatrixConfig(item.config)
+  const configIssues =
+    item.kind === 'journal_entry'
+      ? validateJournalConfig(item.config)
+      : validateMatrixConfig(item.config)
   if (configIssues.length > 0) return json({ error: 'Question configuration is invalid' }, 500)
-  const config = asMatrixConfig(item.config)
 
-  const responseIssues = validateMatrixResponse(config, answers)
+  const responseIssues =
+    item.kind === 'journal_entry'
+      ? validateJournalResponse(asJournalConfig(item.config), answers)
+      : validateMatrixResponse(asMatrixConfig(item.config), answers)
   if (responseIssues.length > 0)
     return json({ error: 'Malformed submission', details: responseIssues }, 400)
 
@@ -145,10 +155,24 @@ Deno.serve(async (req) => {
     .maybeSingle()
   if (keyError) return json({ error: keyError.message }, 500)
   if (!keyRow) return json({ error: 'This activity has no answer key yet' }, 500)
-  const keyIssues = validateMatrixKey(config, keyRow.answer_key)
+  const keyIssues =
+    item.kind === 'journal_entry'
+      ? validateJournalKey(asJournalConfig(item.config), keyRow.answer_key)
+      : validateMatrixKey(asMatrixConfig(item.config), keyRow.answer_key)
   if (keyIssues.length > 0) return json({ error: 'Answer key is incomplete' }, 500)
 
-  const feedback = scoreMatrix(config, asMatrixKey(keyRow.answer_key), asMatrixResponse(answers))
+  const feedback: MatrixFeedback =
+    item.kind === 'journal_entry'
+      ? scoreJournal(
+          asJournalConfig(item.config),
+          asJournalKey(keyRow.answer_key),
+          asMatrixResponse(answers),
+        )
+      : scoreMatrix(
+          asMatrixConfig(item.config),
+          asMatrixKey(keyRow.answer_key),
+          asMatrixResponse(answers),
+        )
   const storedFeedback = {
     ...feedback,
     overall_explanation_md: keyRow.overall_explanation_md ?? null,
@@ -189,7 +213,8 @@ Deno.serve(async (req) => {
   const errorRows = []
   for (const row of feedback.rows) {
     for (const cell of row.cells) {
-      if (cell.ok || (cell.column_id !== 'debit' && cell.column_id !== 'credit')) continue
+      const loggable = ['debit', 'credit', 'amount'].includes(cell.column_id)
+      if (cell.ok || !loggable) continue
       errorRows.push({
         attempt_id: attempt.id,
         item_id: item.id,

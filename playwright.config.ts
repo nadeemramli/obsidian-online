@@ -5,6 +5,9 @@ import fs from 'node:fs'
 const localChromium = '/opt/pw-browsers/chromium'
 const executablePath = fs.existsSync(localChromium) ? localChromium : undefined
 
+// Override when another dev server already occupies 5173: E2E_PORT=5199 npm run test:e2e
+const port = Number(process.env.E2E_PORT || 5173)
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -12,7 +15,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
   },
   projects: [
@@ -25,8 +28,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://localhost:5173',
+    command: `npm run dev -- --port ${port} --strictPort`,
+    url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
