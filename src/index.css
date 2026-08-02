@@ -409,6 +409,78 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 
 .editor-area.dragging { border-color: var(--accent); border-style: dashed; background: var(--bg-2); }
 
+/* Quiz mode — full-screen snap cards, one per flick */
+.quiz-page { height: 100%; display: flex; flex-direction: column; }
+.quiz-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+  flex-wrap: wrap;
+}
+.quiz-toolbar h1 { margin: 0; font-size: 20px; }
+.quiz-folder {
+  width: auto;
+  max-width: 200px;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+.quiz-count { font-size: 13px; margin-left: auto; }
+.quiz-feed {
+  flex: 1;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+}
+.quiz-card {
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.quiz-progress { color: var(--muted); font-size: 12px; flex: none; }
+.quiz-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  min-height: 0;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+.quiz-kicker { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em; }
+.quiz-prompt { font-family: var(--serif); font-size: 30px; line-height: 1.25; margin: 0; }
+.quiz-source { color: var(--muted); font-size: 13px; }
+.quiz-answer {
+  text-align: left;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 55%;
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 18px;
+  font-size: 15.5px;
+}
+.quiz-actions { flex: none; display: flex; justify-content: center; padding: 10px 0 4px; }
+.quiz-actions .btn { min-width: 180px; }
+
+@media (max-width: 720px) {
+  .quiz-prompt { font-size: 24px; }
+  .quiz-card { padding: 12px 16px; }
+}
+
 /* Graph view */
 .graph-page { max-width: 1100px; }
 .graph {

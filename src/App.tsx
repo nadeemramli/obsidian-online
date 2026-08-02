@@ -13,6 +13,7 @@ import NoteEdit from './pages/NoteEdit'
 import NewNote from './pages/NewNote'
 import Settings from './pages/Settings'
 import Graph from './pages/Graph'
+import Quiz from './pages/Quiz'
 import PracticeHome from './pages/practice/PracticeHome'
 import SpecificPractice from './pages/practice/SpecificPractice'
 import StatementPractice from './pages/practice/StatementPractice'
@@ -46,6 +47,7 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/new" element={<NewNote />} />
                 <Route path="/graph" element={<Graph />} />
+                <Route path="/quiz" element={<Quiz />} />
                 <Route path="/note/:slug" element={<NoteView />} />
                 <Route path="/note/:slug/edit" element={<NoteEdit />} />
                 <Route path="/settings" element={<Settings />} />

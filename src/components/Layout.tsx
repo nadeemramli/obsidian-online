@@ -178,6 +178,9 @@ function LayoutInner() {
           <Link className="btn block" to="/practice">
             🎓 Practice
           </Link>
+          <Link className="btn block" to="/quiz">
+            🎴 Quiz
+          </Link>
           {isEditor && (
             <Link className="btn block" to="/builder">
               🛠 Builder
