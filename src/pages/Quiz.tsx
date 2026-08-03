@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNotes } from '../lib/notesContext'
 import { buildQuizCards, shuffleCards } from '../lib/quiz'
-import { topFolder } from '../lib/graphLayout'
 import { Markdown } from '../lib/markdown'
 
 export default function Quiz() {
@@ -11,13 +10,25 @@ export default function Quiz() {
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
   const knownSlugs = useMemo(() => new Set(notes.map((n) => n.slug)), [notes])
 
-  const folders = useMemo(
-    () => Array.from(new Set(notes.map((n) => topFolder(n.folder)).filter(Boolean))).sort(),
-    [notes],
-  )
+  // Every folder path plus its ancestors, so "ACCA/FFA" is selectable
+  // directly and "ACCA" covers everything beneath it.
+  const folders = useMemo(() => {
+    const set = new Set<string>()
+    for (const n of notes) {
+      const segments = (n.folder || '').split('/').map((s) => s.trim()).filter(Boolean)
+      let path = ''
+      for (const seg of segments) {
+        path = path ? `${path}/${seg}` : seg
+        set.add(path)
+      }
+    }
+    return Array.from(set).sort()
+  }, [notes])
 
   const cards = useMemo(() => {
-    const pool = folder ? notes.filter((n) => topFolder(n.folder) === folder) : notes
+    const pool = folder
+      ? notes.filter((n) => n.folder === folder || n.folder.startsWith(`${folder}/`))
+      : notes
     return shuffleCards(buildQuizCards(pool), seed)
   }, [notes, folder, seed])
 
@@ -71,7 +82,7 @@ export default function Quiz() {
                 {i + 1} / {cards.length}
               </div>
               <div className="quiz-body">
-                <div className="quiz-kicker">Ask them to explain</div>
+                <div className="quiz-kicker">Ask them</div>
                 <h2 className="quiz-prompt">{c.prompt}</h2>
                 <div className="quiz-source">
                   {c.folder ? `📁 ${c.folder} · ` : ''}
